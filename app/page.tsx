@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Wallet, Shield, AlertTriangle, ExternalLink, Edit } from "lucide-react";
-import { useState, useEffect } from 'react';
+import { Globe, AlertTriangle, ExternalLink, Edit } from "lucide-react";
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
@@ -47,7 +47,7 @@ export default function Home() {
   };
 
   // Fetch owned domains from our backend API
-  const fetchOwnedDomains = async (walletAddress: string): Promise<OwnedDomain[]> => {
+  const fetchOwnedDomains = useCallback(async (walletAddress: string): Promise<OwnedDomain[]> => {
     setIsLoadingDomains(true);
     try {
       console.log('Fetching domains for address:', walletAddress);
@@ -69,7 +69,7 @@ export default function Home() {
     } finally {
       setIsLoadingDomains(false);
     }
-  };
+  }, [chainId]);
 
   // Load owned domains when wallet connects and is on correct network
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function Home() {
     } else if (!isConnected) {
       setOwnedDomains([]);
     }
-  }, [isConnected, address, isOnSepolia]);
+  }, [isConnected, address, isOnSepolia, fetchOwnedDomains]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 via-pink-500 to-orange-400 relative overflow-hidden">
@@ -199,7 +199,7 @@ export default function Home() {
                       <Globe className="w-12 h-12 mx-auto text-white/60 mb-4" />
                       <p className="text-lg font-medium text-white mb-2">No domains found</p>
                       <p className="text-sm text-white/80">
-                        This wallet doesn't own any domains on the Doma network yet
+                        This wallet doesn&apos;t own any domains on the Doma network yet
                       </p>
                     </div>
                   ) : (

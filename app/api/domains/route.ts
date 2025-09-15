@@ -71,7 +71,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform API response to our domain format
-    const domains = apiResponse.data.names.items.map((item: any) => ({
+    const domains = apiResponse.data.names.items.map((item: {
+      name: string;
+      expiresAt: string;
+      tokens: Array<{ tokenId: string; ownerAddress: string }>;
+    }) => ({
       domain: item.name,
       createdAt: new Date().toISOString(), // API doesn't provide creation date
       expiresAt: item.expiresAt,

@@ -6,7 +6,7 @@ import { Edit, Globe } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { AmountInput, formatPrice, CURRENCIES } from '@/components/ui/amount-input';
+import { AmountInput, formatPrice } from '@/components/ui/amount-input';
 import { generateHTML, PageSettings } from '@/lib/generate-html';
 
 

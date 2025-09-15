@@ -2,7 +2,6 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, ExternalLink, Globe, Shield } from "lucide-react";
@@ -216,7 +215,7 @@ export function DomainPointingInstructions({
                   <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg">
                     <h4 className="font-semibold mb-2">Configure Gateway</h4>
                     <p className="text-sm text-muted-foreground">
-                      You'll need to configure the IPFS gateway to serve your specific hash for your domain.
+                      You&apos;ll need to configure the IPFS gateway to serve your specific hash for your domain.
                       This typically requires additional setup with the gateway provider.
                     </p>
                   </div>
@@ -236,7 +235,7 @@ export function DomainPointingInstructions({
                       <li>2. Select your domain</li>
                       <li>3. Go to DNS tab</li>
                       <li>4. Add the TXT record above</li>
-                      <li>5. Set proxy status to "DNS only"</li>
+                      <li>5. Set proxy status to &quot;DNS only&quot;</li>
                     </ol>
                   </CardContent>
                 </Card>
@@ -249,8 +248,8 @@ export function DomainPointingInstructions({
                     <ol className="text-sm space-y-2">
                       <li>1. Log into Namecheap</li>
                       <li>2. Go to Domain List</li>
-                      <li>3. Click "Manage" next to your domain</li>
-                      <li>4. Go to "Advanced DNS"</li>
+                      <li>3. Click &quot;Manage&quot; next to your domain</li>
+                      <li>4. Go to &quot;Advanced DNS&quot;</li>
                       <li>5. Add the TXT record</li>
                     </ol>
                   </CardContent>
@@ -265,7 +264,7 @@ export function DomainPointingInstructions({
                       <li>1. Sign in to GoDaddy</li>
                       <li>2. Go to My Products</li>
                       <li>3. Click DNS next to your domain</li>
-                      <li>4. Click "Add" to add new record</li>
+                      <li>4. Click &quot;Add&quot; to add new record</li>
                       <li>5. Select TXT and enter values</li>
                     </ol>
                   </CardContent>
@@ -280,7 +279,7 @@ export function DomainPointingInstructions({
                       <li>1. Go to Google Domains</li>
                       <li>2. Select your domain</li>
                       <li>3. Go to DNS tab</li>
-                      <li>4. Scroll to "Custom records"</li>
+                      <li>4. Scroll to &quot;Custom records&quot;</li>
                       <li>5. Add TXT record</li>
                     </ol>
                   </CardContent>
@@ -299,7 +298,7 @@ export function DomainPointingInstructions({
                   <ul className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
                     <li>• DNS changes can take up to 24 hours to propagate</li>
                     <li>• Test your domain on multiple IPFS gateways</li>
-                    <li>• Keep your IPFS hash saved - you'll need it for updates</li>
+                    <li>• Keep your IPFS hash saved - you&apos;ll need it for updates</li>
                     <li>• Consider pinning your content to multiple IPFS nodes for reliability</li>
                   </ul>
                 </div>

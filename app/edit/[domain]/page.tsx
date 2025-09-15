@@ -6,13 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Download, Eye, Globe, Upload, ExternalLink, Settings, DollarSign } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { DomainPointingInstructions } from '@/components/domain-pointing-instructions';
-import { AmountInput, CURRENCIES, formatPrice } from '@/components/ui/amount-input';
+import { AmountInput } from '@/components/ui/amount-input';
 import { generateHTML, PageSettings } from '@/lib/generate-html';
 
 

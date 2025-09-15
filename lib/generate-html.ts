@@ -585,16 +585,6 @@ export function generateHTML(domain: string, settings: PageSettings): string {
       .hero::before {
         animation: float 6s ease-in-out infinite;
       }
-
-      @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
-      }
-
-      .logo {
-        background-size: 200% auto;
-        animation: shimmer 3s linear infinite;
-      }
     </style>
   </head>
   <body>

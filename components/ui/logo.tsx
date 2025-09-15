@@ -42,9 +42,6 @@ export function Logo({
 }: LogoProps) {
   // Calculate text size based on logo height
   const getTextSize = () => {
-    const baseHeight = 60; // Default logo height
-    const scale = height / baseHeight;
-    
     switch (textSize) {
       case 'sm':
         return Math.max(12, height * 0.3);
