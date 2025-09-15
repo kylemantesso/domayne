@@ -39,7 +39,7 @@ export function DomainPointingInstructions({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-4xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Globe className="w-5 h-5" />
@@ -122,13 +122,14 @@ export function DomainPointingInstructions({
                         <div>
                           <span className="font-medium">Name:</span> _dnslink.{domain}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Value:</span>
-                          <code className="bg-muted px-2 py-1 rounded text-xs">dnslink={dnsLinkValue}</code>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium flex-shrink-0">Value:</span>
+                          <code className="bg-muted px-2 py-1 rounded text-xs truncate max-w-xs">dnslink={dnsLinkValue}</code>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => copyToClipboard(`dnslink=${dnsLinkValue}`, 'dnslink')}
+                            className="flex-shrink-0"
                           >
                             <Copy className="w-3 h-3" />
                           </Button>
@@ -194,13 +195,14 @@ export function DomainPointingInstructions({
                         <div>
                           <span className="font-medium">Name:</span> @ (or www)
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Value:</span>
-                          <code className="bg-muted px-2 py-1 rounded text-xs">{cnameTarget}</code>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium flex-shrink-0">Value:</span>
+                          <code className="bg-muted px-2 py-1 rounded text-xs truncate max-w-xs">{cnameTarget}</code>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => copyToClipboard(cnameTarget, 'cname')}
+                            className="flex-shrink-0"
                           >
                             <Copy className="w-3 h-3" />
                           </Button>
