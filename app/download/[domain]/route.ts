@@ -218,6 +218,188 @@ export async function GET(
         }
       }
 
+      async function initializeXMTP(account) {
+        try {
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <h4 class="text-lg font-semibold mb-2">Initializing XMTP</h4>
+              <p class="text-gray-600">Setting up secure messaging...</p>
+            </div>
+          \`);
+
+          const XMTP = await waitForXMTP();
+
+          // Create a proper wallet instance for XMTP
+          const wallet = {
+            getAddress: async () => account,
+            signMessage: async (message) => {
+              return await window.ethereum.request({
+                method: 'personal_sign',
+                params: [message, account]
+              });
+            }
+          };
+
+          // Initialize XMTP client with proper wallet
+          xmtpClient = await XMTP.Client.create(wallet, { env: 'production' });
+          isConnected = true;
+
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="text-4xl mb-4">✅</div>
+              <h4 class="text-lg font-semibold mb-2 text-green-600">XMTP Ready!</h4>
+              <p class="text-gray-600 mb-4">You can now send secure messages</p>
+              <button onclick="startConversation()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                Start Messaging
+              </button>
+            </div>
+          \`);
+
+        } catch (error) {
+          console.error('XMTP initialization failed:', error);
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="text-4xl mb-4">❌</div>
+              <h4 class="text-lg font-semibold mb-2 text-red-600">XMTP Failed</h4>
+              <p class="text-gray-600 mb-4">Could not initialize secure messaging</p>
+              <button onclick="connectWallet()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                Try Again
+              </button>
+            </div>
+          \`);
+        }
+      }
+
+      async function startConversation() {
+        if (!xmtpClient) {
+          alert('XMTP not initialized');
+          return;
+        }
+
+        const sellerAddress = window.domainSettings.sellerAddress;
+        if (!sellerAddress) {
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="text-4xl mb-4">📧</div>
+              <h4 class="text-lg font-semibold mb-2">Contact Seller</h4>
+              <p class="text-gray-600 mb-4">No XMTP address configured. Please contact the seller directly.</p>
+              <button onclick="closeModal()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
+                Close
+              </button>
+            </div>
+          \`);
+          return;
+        }
+
+        try {
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+              <h4 class="text-lg font-semibold mb-2">Starting Conversation</h4>
+              <p class="text-gray-600">Connecting with seller...</p>
+            </div>
+          \`);
+
+          currentConversation = await xmtpClient.conversations.newConversation(sellerAddress);
+
+          showChatInterface();
+
+        } catch (error) {
+          console.error('Failed to start conversation:', error);
+          updateModalContent(\`
+            <div class="text-center">
+              <div class="text-4xl mb-4">❌</div>
+              <h4 class="text-lg font-semibold mb-2 text-red-600">Connection Failed</h4>
+              <p class="text-gray-600 mb-4">Could not connect to seller</p>
+              <button onclick="startConversation()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                Try Again
+              </button>
+            </div>
+          \`);
+        }
+      }
+
+      function showChatInterface() {
+        const modal = document.getElementById('xmtp-modal');
+        if (!modal) return;
+
+        modal.innerHTML = \`
+          <div class="bg-white rounded-lg w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between p-4 border-b">
+              <h3 class="text-lg font-semibold">Chat about \${window.domainSettings.domain}</h3>
+              <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div id="messages-container" class="flex-1 p-4 overflow-y-auto min-h-[300px] max-h-[400px]">
+              <div class="text-center text-gray-500 py-8">
+                <div class="text-4xl mb-2">👋</div>
+                <p>Say hello to start the conversation!</p>
+              </div>
+            </div>
+            <div class="border-t p-4">
+              <div class="flex gap-2">
+                <input
+                  id="message-input"
+                  type="text"
+                  placeholder="Type your message..."
+                  class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onkeypress="if(event.key==='Enter') sendMessage()"
+                />
+                <button
+                  onclick="sendMessage()"
+                  class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        \`;
+      }
+
+      async function sendMessage() {
+        const input = document.getElementById('message-input');
+        if (!input || !input.value.trim() || !currentConversation) return;
+
+        const message = input.value.trim();
+        input.value = '';
+
+        try {
+          await currentConversation.send(message);
+          addMessageToChat(message, true);
+        } catch (error) {
+          console.error('Failed to send message:', error);
+          alert('Failed to send message. Please try again.');
+        }
+      }
+
+      function addMessageToChat(content, isSent) {
+        const container = document.getElementById('messages-container');
+        if (!container) return;
+
+        // Remove welcome message if it exists
+        const welcome = container.querySelector('.text-center.text-gray-500');
+        if (welcome) welcome.remove();
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = \`flex \${isSent ? 'justify-end' : 'justify-start'} mb-4\`;
+        messageDiv.innerHTML = \`
+          <div class="\${isSent ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
+            <p class="text-sm">\${content}</p>
+            <p class="text-xs mt-1 opacity-70">\${new Date().toLocaleTimeString()}</p>
+          </div>
+        \`;
+
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+      }
+
       function updateModalContent(html) {
         const content = document.getElementById('modal-content');
         if (content) {
