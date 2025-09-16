@@ -6,16 +6,28 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Download, Eye, Globe, Upload, ExternalLink, Settings, DollarSign } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Download, Eye, Globe, Upload, ExternalLink, Settings, DollarSign, MessageCircle, Wallet, Copy, Check } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { DomainPointingInstructions } from '@/components/domain-pointing-instructions';
 import { AmountInput } from '@/components/ui/amount-input';
-import { generateHTML, PageSettings } from '@/lib/generate-html';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useEnsName } from 'wagmi';
 
-
-
+interface PageSettings {
+  title: string;
+  description: string;
+  ownerName: string;
+  contactEmail: string;
+  price: string;
+  currency: string;
+  industryTags: string[];
+  sellerAddress?: string;
+  sellerEns?: string;
+  enableXMTP: boolean;
+}
 
 interface IPFSUploadResult {
   success: boolean;
@@ -35,6 +47,12 @@ export default function SitePreviewPage() {
   const [publishResult, setPublishResult] = useState<IPFSUploadResult | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
 
+  // Wallet connection hooks
+  const { address, isConnected } = useAccount();
+  const { connect, connectors, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { data: ensName } = useEnsName({ address });
+
   // Page settings state
   const [pageSettings, setPageSettings] = useState<PageSettings>({
     title: `Buy ${domain} – A Premium Domain for Your Brand`,
@@ -43,7 +61,11 @@ export default function SitePreviewPage() {
     contactEmail: '',
     price: '',
     currency: 'USD',
-    industryTags: []
+    industryTags: [],
+    // XMTP configuration
+    sellerAddress: '',
+    sellerEns: '',
+    enableXMTP: true
   });
 
   // Load URL parameters on mount
@@ -60,10 +82,69 @@ export default function SitePreviewPage() {
     }
   }, [searchParams]);
 
-  const generatedHTML = generateHTML(domain, pageSettings);
 
   const updatePageSettings = (updates: Partial<PageSettings>) => {
     setPageSettings(prev => ({ ...prev, ...updates }));
+  };
+
+  // Auto-populate seller info when wallet connects
+  useEffect(() => {
+    if (isConnected && address) {
+      const updates: Partial<PageSettings> = {
+        sellerAddress: address,
+      };
+
+      // Also set ENS if available
+      if (ensName) {
+        updates.sellerEns = ensName;
+      }
+
+      updatePageSettings(updates);
+    }
+  }, [isConnected, address, ensName]);
+
+  // Wallet connection handlers
+  const handleConnectWallet = () => {
+    const connector = connectors.find(c => c.name === 'MetaMask') || connectors[0];
+    if (connector) {
+      connect({ connector });
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    disconnect();
+    // Clear the seller address and ENS when disconnecting
+    updatePageSettings({
+      sellerAddress: '',
+      sellerEns: ''
+    });
+  };
+
+  const handleUseConnectedWallet = () => {
+    if (address) {
+      const updates: Partial<PageSettings> = {
+        sellerAddress: address,
+      };
+
+      if (ensName) {
+        updates.sellerEns = ensName;
+      }
+
+      updatePageSettings(updates);
+    }
+  };
+
+  // Copy to clipboard functionality
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
   };
 
   const addIndustryTag = (tag: string) => {
@@ -83,33 +164,60 @@ export default function SitePreviewPage() {
     }));
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setIsDownloading(true);
 
-    const blob = new Blob([generatedHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
+    try {
+      // Use the new download endpoint
+      const params = new URLSearchParams({
+        ...(pageSettings.price && { price: pageSettings.price }),
+        ...(pageSettings.currency && { currency: pageSettings.currency })
+      });
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'index.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      params.set('download', 'true');
+      const downloadUrl = `/download/${encodeURIComponent(domain)}?${params.toString()}`;
 
-    setTimeout(() => setIsDownloading(false), 1000);
+      // Create a temporary link to trigger download
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `${domain}-index.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download HTML. Please try again.');
+    } finally {
+      setTimeout(() => setIsDownloading(false), 1000);
+    }
   };
 
   const handlePublishToIPFS = async () => {
     setIsPublishing(true);
     try {
+      // Generate HTML using the download endpoint
+      const params = new URLSearchParams({
+        ...(pageSettings.price && { price: pageSettings.price }),
+        ...(pageSettings.currency && { currency: pageSettings.currency })
+      });
+
+      const downloadUrl = `/download/${encodeURIComponent(domain)}?${params.toString()}`;
+
+      // Fetch the HTML content
+      const htmlResponse = await fetch(downloadUrl);
+      if (!htmlResponse.ok) {
+        throw new Error('Failed to generate HTML');
+      }
+
+      const htmlContent = await htmlResponse.text();
+
       const response = await fetch('/api/ipfs/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          html: generatedHTML,
+          html: htmlContent,
           domain: domain,
         }),
       });
@@ -195,7 +303,10 @@ export default function SitePreviewPage() {
                     <span className="ml-2">https://{domain}</span>
                   </div>
                   <iframe
-                    srcDoc={generatedHTML}
+                    src={`/domain/${encodeURIComponent(domain)}?${new URLSearchParams({
+                      ...(pageSettings.price && { price: pageSettings.price }),
+                      ...(pageSettings.currency && { currency: pageSettings.currency })
+                    }).toString()}`}
                     className="w-full h-[600px] border-0"
                     title="Site Preview"
                     sandbox="allow-scripts allow-same-origin"
@@ -238,6 +349,12 @@ export default function SitePreviewPage() {
                     <Badge variant="outline" className="text-xs">Trust</Badge>
                     Verification badges
                   </div>
+                  {pageSettings.enableXMTP && (
+                    <div className="flex items-center gap-2 col-span-2">
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">XMTP</Badge>
+                      Wallet-to-wallet messaging
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -314,6 +431,218 @@ export default function SitePreviewPage() {
                   onCurrencyChange={(currency) => updatePageSettings({ currency })}
                   placeholder="10000"
                 />
+              </CardContent>
+            </Card>
+
+            {/* XMTP Chat Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5" />
+                  XMTP Chat Integration
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Enable wallet-to-wallet messaging for direct buyer-seller communication
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="enableXMTP"
+                    checked={pageSettings.enableXMTP}
+                    onCheckedChange={(checked) => updatePageSettings({ enableXMTP: checked as boolean })}
+                  />
+                  <Label htmlFor="enableXMTP" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Enable XMTP Chat Widget
+                  </Label>
+                </div>
+
+                {pageSettings.enableXMTP && (
+                  <div className="space-y-4 pt-2 border-t">
+                    {/* Wallet Connection Section */}
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <Wallet className="w-4 h-4" />
+                          Connected Wallet
+                        </h4>
+                        {isConnected ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDisconnectWallet}
+                            className="text-xs"
+                          >
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleConnectWallet}
+                            disabled={isPending}
+                            className="text-xs gap-1"
+                          >
+                            <Wallet className="w-3 h-3" />
+                            {isPending ? 'Connecting...' : 'Connect Wallet'}
+                          </Button>
+                        )}
+                      </div>
+
+                      {isConnected && address ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Address:</span>
+                            <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded text-xs font-mono">
+                              {address.slice(0, 6)}...{address.slice(-4)}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(address, 'address')}
+                              className="p-1 h-6 w-6"
+                            >
+                              {copiedField === 'address' ? (
+                                <Check className="w-3 h-3 text-green-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </Button>
+                          </div>
+
+                          {ensName && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-muted-foreground">ENS:</span>
+                              <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded text-xs font-mono">
+                                {ensName}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copyToClipboard(ensName, 'ens')}
+                                className="p-1 h-6 w-6"
+                              >
+                                {copiedField === 'ens' ? (
+                                  <Check className="w-3 h-3 text-green-600" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </Button>
+                            </div>
+                          )}
+
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleUseConnectedWallet}
+                            className="w-full mt-2 gap-1"
+                          >
+                            <Check className="w-3 h-3" />
+                            Use This Wallet for XMTP
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Connect your wallet to auto-populate seller information below
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="sellerAddress">Seller Wallet Address</Label>
+                        {pageSettings.sellerAddress && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(pageSettings.sellerAddress || '', 'sellerAddress')}
+                            className="p-1 h-6 w-6"
+                          >
+                            {copiedField === 'sellerAddress' ? (
+                              <Check className="w-3 h-3 text-green-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        id="sellerAddress"
+                        value={pageSettings.sellerAddress || ''}
+                        onChange={(e) => updatePageSettings({ sellerAddress: e.target.value })}
+                        placeholder="0x1234567890123456789012345678901234567890"
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The Ethereum wallet address buyers will send messages to
+                      </p>
+                    </div>
+
+                    <div className="text-center text-xs text-muted-foreground">— OR —</div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="sellerEns">Seller ENS Name</Label>
+                        {pageSettings.sellerEns && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(pageSettings.sellerEns || '', 'sellerEns')}
+                            className="p-1 h-6 w-6"
+                          >
+                            {copiedField === 'sellerEns' ? (
+                              <Check className="w-3 h-3 text-green-600" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        id="sellerEns"
+                        value={pageSettings.sellerEns || ''}
+                        onChange={(e) => updatePageSettings({ sellerEns: e.target.value })}
+                        placeholder="seller.eth"
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        ENS domain that resolves to your wallet address (recommended)
+                      </p>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-blue-900 dark:text-blue-100">How XMTP Chat Works:</p>
+                          <ul className="text-blue-700 dark:text-blue-200 mt-1 space-y-1 text-xs">
+                            <li>• Buyers click "Chat with Seller" and connect their wallet</li>
+                            <li>• Messages are encrypted end-to-end via XMTP protocol</li>
+                            <li>• Works with MetaMask, WalletConnect, and other wallets</li>
+                            <li>• No server required - purely peer-to-peer messaging</li>
+                            <li>• Optimized for Sepolia testnet with auto-switching</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!pageSettings.sellerAddress && !pageSettings.sellerEns && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          <strong>⚠️ No seller configured:</strong> The chat widget will show an email fallback using the contact email above.
+                        </p>
+                      </div>
+                    )}
+
+                    {pageSettings.sellerAddress && pageSettings.sellerEns && (
+                      <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
+                        <p className="text-sm text-green-800 dark:text-green-200">
+                          <strong>✅ Multiple options configured:</strong> ENS will be used first, with wallet address as fallback.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

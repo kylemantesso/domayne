@@ -652,3 +652,15 @@ supabase db push          # Deploy migrations
 9. **Implement proper error boundaries**
 10. **Stream data with Suspense for better UX**
 11. **Test business logic, not implementation details**
+
+# CRITICAL RULE: NO DEMO MODES
+NEVER implement demo modes, mock functionality, or placeholder features.
+All functionality must work completely and properly.
+If something cannot work, fix it to work properly - do not create fake/demo versions.
+This applies to ALL features including XMTP, wallet connections, API integrations, etc.
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

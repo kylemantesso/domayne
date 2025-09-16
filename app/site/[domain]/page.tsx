@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { AmountInput, formatPrice } from '@/components/ui/amount-input';
-import { generateHTML, PageSettings } from '@/lib/generate-html';
 
 
 
@@ -29,18 +28,6 @@ export default function SitePreviewPage() {
     if (urlCurrency) setPreviewCurrency(urlCurrency);
   }, [searchParams]);
 
-  // Default page settings for preview with dynamic pricing
-  const defaultSettings: PageSettings = {
-    title: `Buy ${domain} – A Premium Domain for Your Brand`,
-    description: `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`,
-    ownerName: `${domain} Owner`,
-    contactEmail: '',
-    price: previewPrice,
-    currency: previewCurrency,
-    industryTags: []
-  };
-
-  const generatedHTML = generateHTML(domain, defaultSettings);
 
   // Create edit URL with current pricing
   const createEditUrl = () => {
@@ -115,10 +102,13 @@ export default function SitePreviewPage() {
         </div>
       </div>
 
-      {/* Full Site Preview */}
+      {/* Full Site Preview - Use single download route */}
       <div className="relative">
         <iframe
-          srcDoc={generatedHTML}
+          src={`/download/${encodeURIComponent(domain)}?${new URLSearchParams({
+            ...(previewPrice && { price: previewPrice }),
+            ...(previewCurrency && { currency: previewCurrency })
+          }).toString()}`}
           className="w-full h-screen border-0"
           title={`${domain} Preview`}
           sandbox="allow-scripts allow-same-origin"
