@@ -42,6 +42,7 @@ export interface AmountInputProps {
   compact?: boolean;
   placeholder?: string;
   className?: string;
+  ethOnly?: boolean;
 }
 
 export function AmountInput({
@@ -52,22 +53,30 @@ export function AmountInput({
   showIcon = true,
   compact = false,
   placeholder = "Enter amount",
-  className = ""
+  className = "",
+  ethOnly = false
 }: AmountInputProps) {
   // Get currency symbol for display
   const allCurrencies = [...CURRENCIES.fiat, ...CURRENCIES.crypto];
   const selectedCurrency = allCurrencies.find(c => c.code === currency);
-  const currencySymbol = selectedCurrency?.symbol || currency;
+  const currencySymbol = ethOnly ? 'Ξ' : (selectedCurrency?.symbol || currency);
 
   // Handle formatted input change
   const handleInputChange = (value: string) => {
-    // Remove any non-digits
-    const cleanValue = value.replace(/[^\d]/g, '');
-    onPriceChange(cleanValue);
+    // Allow digits and one decimal point
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    // Ensure only one decimal point
+    const parts = cleanValue.split('.');
+    if (parts.length > 2) {
+      const finalValue = parts[0] + '.' + parts.slice(1).join('');
+      onPriceChange(finalValue);
+    } else {
+      onPriceChange(cleanValue);
+    }
   };
 
-  // Format value for display
-  const displayValue = price ? formatNumber(price) : '';
+  // Format value for display - no formatting for decimals, just return as-is
+  const displayValue = price || '';
 
   if (compact) {
     return (
@@ -84,25 +93,54 @@ export function AmountInput({
             placeholder={placeholder}
             className="w-24 h-8 text-sm"
           />
-          <Select value={currency} onValueChange={onCurrencyChange}>
-            <SelectTrigger className="w-20 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Fiat</div>
-              {CURRENCIES.fiat.map((curr) => (
-                <SelectItem key={curr.code} value={curr.code} className="text-xs">
-                  {curr.code}
-                </SelectItem>
-              ))}
-              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Crypto</div>
-              {CURRENCIES.crypto.map((curr) => (
-                <SelectItem key={curr.code} value={curr.code} className="text-xs">
-                  {curr.code}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {!ethOnly && (
+            <Select value={currency} onValueChange={onCurrencyChange}>
+              <SelectTrigger className="w-20 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Fiat</div>
+                {CURRENCIES.fiat.map((curr) => (
+                  <SelectItem key={curr.code} value={curr.code} className="text-xs">
+                    {curr.code}
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Crypto</div>
+                {CURRENCIES.crypto.map((curr) => (
+                  <SelectItem key={curr.code} value={curr.code} className="text-xs">
+                    {curr.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {ethOnly && (
+            <span className="text-xs text-muted-foreground w-12">ETH</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (ethOnly) {
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <Label htmlFor="price">Price (Optional)</Label>
+        <div className="relative">
+          <Input
+            id="price"
+            type="text"
+            value={displayValue}
+            onChange={(e) => handleInputChange(e.target.value)}
+            placeholder={placeholder}
+            className="pl-8 pr-12"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            {currencySymbol}
+          </span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            ETH
+          </span>
         </div>
       </div>
     );

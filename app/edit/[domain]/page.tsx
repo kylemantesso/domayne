@@ -13,8 +13,9 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { DomainPointingInstructions } from '@/components/domain-pointing-instructions';
 import { AmountInput } from '@/components/ui/amount-input';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from 'wagmi';
 import { useEnsName } from 'wagmi';
+import { createDomaOrderbookClient, OrderbookType, viemToEthersSigner } from '@doma-protocol/orderbook-sdk';
 
 interface PageSettings {
   title: string;
@@ -38,6 +39,17 @@ interface IPFSUploadResult {
   note?: string;
 }
 
+interface DomaListing {
+  id: string;
+  price: string;
+  currency: string;
+  tokenId: string;
+  seller: string;
+  createdAt: string;
+  network: string;
+  orderbook: string;
+}
+
 export default function SitePreviewPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -46,12 +58,20 @@ export default function SitePreviewPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<IPFSUploadResult | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  
+  // Doma listing state
+  const [domaListing, setDomaListing] = useState<DomaListing | null>(null);
+  const [isCheckingListing, setIsCheckingListing] = useState(false);
+  const [isCreatingListing, setIsCreatingListing] = useState(false);
+  const [showCreateListing, setShowCreateListing] = useState(false);
 
   // Wallet connection hooks
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: ensName } = useEnsName({ address });
+  const { switchChain } = useSwitchChain();
+  const { data: walletClient } = useWalletClient();
 
   // Page settings state
   const [pageSettings, setPageSettings] = useState<PageSettings>({
@@ -60,7 +80,7 @@ export default function SitePreviewPage() {
     ownerName: `${domain} Owner`,
     contactEmail: '',
     price: '',
-    currency: 'USD',
+    currency: 'ETH',
     industryTags: [],
     // XMTP configuration
     sellerAddress: '',
@@ -81,6 +101,11 @@ export default function SitePreviewPage() {
       }));
     }
   }, [searchParams]);
+
+  // Check for existing Doma listing on mount
+  useEffect(() => {
+    checkDomaListing();
+  }, [domain]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const updatePageSettings = (updates: Partial<PageSettings>) => {
@@ -147,6 +172,198 @@ export default function SitePreviewPage() {
     }
   };
 
+  // Function to check for existing Doma listing
+  const checkDomaListing = async () => {
+    setIsCheckingListing(true);
+    try {
+      const response = await fetch(`/api/doma/check-listing?domain=${encodeURIComponent(domain)}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Doma listing check failed:', response.status, errorData);
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('Doma listing check error:', data.error, data.details);
+        return;
+      }
+
+      if (data.listing) {
+        const listing = data.listing;
+        setDomaListing(listing);
+        
+        // Update page settings with listing data
+        updatePageSettings({
+          price: listing.price,
+          currency: listing.currency,
+          // Note: sellerAddress not available from NameListingModel
+        });
+      } else if (data.note) {
+        console.log('Note from API:', data.note);
+      }
+    } catch (error) {
+      console.error('Error checking Doma listing:', error);
+    } finally {
+      setIsCheckingListing(false);
+    }
+  };
+
+  // Function to create a new Doma listing using SDK with secure backend proxies
+  const createDomaListing = async () => {
+    if (!isConnected || !address) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    if (!pageSettings.price) {
+      alert('Please set a price for the listing');
+      return;
+    }
+
+    if (!walletClient) {
+      alert('Wallet client not available. Please reconnect your wallet.');
+      return;
+    }
+
+    console.log('=== CREATING DOMA LISTING (SECURE BACKEND MODE) ===');
+    console.log('Wallet address:', address);
+    console.log('Chain ID:', chainId);
+
+    // Check if we're on the correct network (Sepolia testnet)
+    const requiredChainId = 11155111; // Sepolia
+    if (chainId !== requiredChainId) {
+      try {
+        console.log(`Switching from chain ${chainId} to ${requiredChainId}`);
+        await switchChain({ chainId: requiredChainId });
+        console.log('Successfully switched to Sepolia testnet');
+        
+        // Wait a moment for the network switch to fully complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (switchError) {
+        console.error('Failed to switch network:', switchError);
+        alert(`Please switch your wallet to Sepolia testnet (Chain ID: ${requiredChainId}). Current chain: ${chainId}`);
+        return;
+      }
+    }
+
+    setIsCreatingListing(true);
+    try {
+      // Step 1: Get NFT details from backend
+      console.log('Step 1: Fetching NFT details for domain:', domain);
+      const nftResponse = await fetch(`/api/doma/domain-details?domain=${encodeURIComponent(domain)}`);
+      
+      if (!nftResponse.ok) {
+        throw new Error('Failed to get domain NFT details');
+      }
+      
+      const nftData = await nftResponse.json();
+      const nftDetails = nftData.nftDetails;
+      
+      if (!nftDetails) {
+        throw new Error('Could not fetch NFT details for domain. Domain may not be tokenized on Doma Protocol.');
+      }
+      
+      console.log('Got NFT details:', nftDetails);
+      
+      // Verify ownership
+      let ownerAddress = nftDetails.owner;
+      if (ownerAddress && ownerAddress.includes(':')) {
+        ownerAddress = ownerAddress.split(':').pop() || ownerAddress;
+      }
+      
+      if (ownerAddress && ownerAddress.toLowerCase() !== address.toLowerCase()) {
+        throw new Error(`You don't own this domain NFT. Owner: ${ownerAddress}`);
+      }
+
+      // Convert price to wei (more accurate conversion)
+      const priceNumber = parseFloat(pageSettings.price);
+      if (priceNumber <= 0) {
+        throw new Error('Price must be greater than 0');
+      }
+      
+      // Convert ETH to wei: 1 ETH = 10^18 wei
+      // Using string manipulation to avoid floating point precision issues
+      const priceStr = priceNumber.toString();
+      const [whole, decimal = ''] = priceStr.split('.');
+      const paddedDecimal = decimal.padEnd(18, '0');
+      const priceInWei = whole + paddedDecimal;
+      
+      console.log('Price conversion:', {
+        inputPrice: pageSettings.price,
+        priceNumber,
+        priceInWei,
+        priceInWeiFormatted: `${BigInt(priceInWei).toString()} wei`
+      });
+
+      console.log('Listing details:', {
+        domain,
+        tokenAddress: nftDetails.contractAddress,
+        tokenId: nftDetails.tokenId,
+        price: priceInWei,
+        priceETH: pageSettings.price,
+        currency: pageSettings.currency,
+        sellerAddress: address,
+      });
+
+      // Step 2: Initialize Doma SDK with backend proxy URL
+      console.log('Step 2: Initializing Doma SDK with backend proxy...');
+      
+      // We'll configure the SDK to use our backend as a proxy
+      // The SDK will make API calls, but they'll go through our secure backend
+      const client = createDomaOrderbookClient({
+        apiClientOptions: {
+          baseUrl: '/api/doma/proxy', // Point to our backend proxy
+        },
+        source: 'domayne',
+        chains: []
+      });
+
+      // Convert Viem wallet client to Ethers signer
+      const signer = viemToEthersSigner(walletClient, 'eip155:11155111');
+      console.log('Converted wallet client to Ethers signer');
+
+      // Step 3: Create and sign the listing with SDK
+      console.log('Step 3: Creating and signing listing with SDK...');
+      const result = await client.createListing({
+        params: {
+          items: [{
+            contract: nftDetails.contractAddress,
+            tokenId: nftDetails.tokenId,
+            price: priceInWei,
+          }],
+          source: 'domayne',
+          orderbook: OrderbookType.DOMA,
+        },
+        signer,
+        chainId: 'eip155:11155111',
+        onProgress: (progress: unknown) => {
+          console.log(`Progress:`, progress);
+        }
+      });
+
+      console.log('SDK result:', result);
+
+      if (result && !result.errors) {
+        alert('Successfully created Doma listing!');
+        await checkDomaListing();
+        setShowCreateListing(false);
+      } else {
+        throw new Error(result.errors ? result.errors.join(', ') : 'Failed to create listing');
+      }
+
+    } catch (error) {
+      console.error('Error creating Doma listing:', error);
+      alert(`Failed to create listing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsCreatingListing(false);
+    }
+  };
+
+
+
   const addIndustryTag = (tag: string) => {
     debugger;
     if (tag.trim() && !pageSettings.industryTags.includes(tag.trim())) {
@@ -171,7 +388,8 @@ export default function SitePreviewPage() {
       // Use the new download endpoint
       const params = new URLSearchParams({
         ...(pageSettings.price && { price: pageSettings.price }),
-        ...(pageSettings.currency && { currency: pageSettings.currency })
+        ...(pageSettings.currency && { currency: pageSettings.currency }),
+        ...(pageSettings.sellerAddress && { sellerAddress: pageSettings.sellerAddress })
       });
 
       params.set('download', 'true');
@@ -198,7 +416,8 @@ export default function SitePreviewPage() {
       // Generate HTML using the download endpoint
       const params = new URLSearchParams({
         ...(pageSettings.price && { price: pageSettings.price }),
-        ...(pageSettings.currency && { currency: pageSettings.currency })
+        ...(pageSettings.currency && { currency: pageSettings.currency }),
+        ...(pageSettings.sellerAddress && { sellerAddress: pageSettings.sellerAddress })
       });
 
       const downloadUrl = `/download/${encodeURIComponent(domain)}?${params.toString()}`;
@@ -305,7 +524,8 @@ export default function SitePreviewPage() {
                   <iframe
                     src={`/domain/${encodeURIComponent(domain)}?${new URLSearchParams({
                       ...(pageSettings.price && { price: pageSettings.price }),
-                      ...(pageSettings.currency && { currency: pageSettings.currency })
+                      ...(pageSettings.currency && { currency: pageSettings.currency }),
+                      ...(pageSettings.sellerAddress && { sellerAddress: pageSettings.sellerAddress })
                     }).toString()}`}
                     className="w-full h-[600px] border-0"
                     title="Site Preview"
@@ -429,8 +649,274 @@ export default function SitePreviewPage() {
                   currency={pageSettings.currency}
                   onPriceChange={(price) => updatePageSettings({ price })}
                   onCurrencyChange={(currency) => updatePageSettings({ currency })}
-                  placeholder="10000"
+                  placeholder="0.0001"
+                  ethOnly={true}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Doma Listing Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
+                  </svg>
+                  Doma Protocol Listing
+                  {isCheckingListing && (
+                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                  )}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  List your domain on the Doma Protocol blockchain marketplace
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {domaListing ? (
+                  // Existing listing display
+                  <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      <span className="font-semibold text-green-800 dark:text-green-200">Listed on Doma Protocol</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Price:</span>
+                        <p className="font-semibold">{domaListing.price} {domaListing.currency}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Network:</span>
+                        <p className="font-semibold">{domaListing.network}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Listed:</span>
+                        <p className="font-semibold">{new Date(domaListing.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Token ID:</span>
+                        <p className="font-mono text-xs">{domaListing.tokenId.slice(0, 10)}...</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`https://dashboard-testnet.doma.xyz/domain/${domain}`, '_blank')}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        View on Doma Testnet
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={checkDomaListing}
+                        disabled={isCheckingListing}
+                        className="gap-1"
+                      >
+                        {isCheckingListing ? (
+                          <div className="w-3 h-3 animate-spin rounded-full border border-gray-400 border-t-transparent"></div>
+                        ) : (
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 4v6h6M23 20v-6h-6"/>
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                          </svg>
+                        )}
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // No listing - show create option
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">No Doma Listing Found</h4>
+                          <p className="text-sm text-blue-700 dark:text-blue-200 mb-3">
+                            This domain is not currently listed on Doma Protocol, or the listing is still being indexed. You can check the <a href={`https://dashboard-testnet.doma.xyz/domain/${domain}`} target="_blank" rel="noopener noreferrer" className="underline font-medium">Doma dashboard</a> directly.
+                          </p>
+                          <div className="space-y-2">
+                            <p className="text-xs text-blue-600 dark:text-blue-300">
+                              <strong>Benefits of Doma listing:</strong>
+                            </p>
+                            <ul className="text-xs text-blue-600 dark:text-blue-300 space-y-1 ml-4">
+                              <li>• Blockchain-verified ownership and transfers</li>
+                              <li>• Secure smart contract-based transactions</li>
+                              <li>• Global marketplace exposure</li>
+                              <li>• Tokenized domain NFT</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setShowCreateListing(true)}
+                        disabled={!pageSettings.price || !isConnected}
+                        className="gap-2"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Create Doma Listing
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={checkDomaListing}
+                        disabled={isCheckingListing}
+                        className="gap-1"
+                      >
+                        {isCheckingListing ? (
+                          <div className="w-3 h-3 animate-spin rounded-full border border-gray-400 border-t-transparent"></div>
+                        ) : (
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 4v6h6M23 20v-6h-6"/>
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                          </svg>
+                        )}
+                        Check Again
+                      </Button>
+                    </div>
+                    
+                    {!pageSettings.price && (
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        ⚠️ Please set a price above to enable listing creation
+                      </p>
+                    )}
+                    
+                    {!isConnected && (
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        ⚠️ Please connect your wallet to create a listing
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Create listing modal/dialog would go here */}
+                {showCreateListing && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">List on Doma Protocol</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowCreateListing(false)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <div className="text-4xl mb-4">🚀</div>
+                          <h4 className="text-lg font-semibold mb-2">Ready to List on Doma?</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Visit Doma Protocol to create a listing for <strong>{domain}</strong> on the blockchain marketplace.
+                          </p>
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg mb-4">
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              <strong>Your domain details:</strong><br/>
+                              Price: {pageSettings.price} {pageSettings.currency}<br/>
+                              Network: Sepolia Testnet<br/>
+                              Owner: {address?.slice(0, 6)}...{address?.slice(-4)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                          <div className="space-y-2">
+                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                              <strong>How it works:</strong>
+                            </p>
+                            <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-1 ml-4 list-decimal">
+                              <li>Creates Seaport-compatible order parameters</li>
+                              <li><strong>Signs the order using your wallet</strong> (EIP-712 signature required)</li>
+                              <li>Submits to Doma Orderbook API for listing</li>
+                              <li>Your domain becomes available on Doma marketplace</li>
+                            </ol>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                              <strong>Requirements:</strong> Domain must be tokenized as NFT on Sepolia testnet
+                            </p>
+                            {isConnected && (
+                              <p className="text-xs mt-2">
+                                <strong>Current Network:</strong> Chain ID {chainId} 
+                                {chainId === 11155111 ? (
+                                  <span className="text-green-600 ml-1">✅ Sepolia (Correct)</span>
+                                ) : (
+                                  <span className="text-amber-600 ml-1">⚠️ Wrong network</span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {isConnected && chainId !== 11155111 && (
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  await switchChain({ chainId: 11155111 });
+                                } catch (error) {
+                                  console.error('Failed to switch network:', error);
+                                  alert('Failed to switch network. Please switch manually in your wallet.');
+                                }
+                              }}
+                              className="w-full gap-2"
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                                <path d="M6 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                                <path d="M12 12h.01"/>
+                                <path d="M12 2v2"/>
+                                <path d="M12 20v2"/>
+                                <path d="M4.93 4.93l1.41 1.41"/>
+                                <path d="M17.66 17.66l1.41 1.41"/>
+                                <path d="M2 12h2"/>
+                                <path d="M20 12h2"/>
+                                <path d="M6.34 17.66l-1.41 1.41"/>
+                                <path d="M19.07 4.93l-1.41 1.41"/>
+                              </svg>
+                              Switch to Sepolia Testnet
+                            </Button>
+                          )}
+                          
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={createDomaListing}
+                            disabled={isCreatingListing}
+                            className="flex-1"
+                          >
+                            {isCreatingListing ? (
+                              <>
+                                <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                                Creating...
+                              </>
+                            ) : (
+                              'Create Listing with SDK'
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowCreateListing(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -616,7 +1102,7 @@ export default function SitePreviewPage() {
                         <div className="text-sm">
                           <p className="font-medium text-blue-900 dark:text-blue-100">How XMTP Chat Works:</p>
                           <ul className="text-blue-700 dark:text-blue-200 mt-1 space-y-1 text-xs">
-                            <li>• Buyers click "Chat with Seller" and connect their wallet</li>
+                            <li>• Buyers click &quot;Chat with Seller&quot; and connect their wallet</li>
                             <li>• Messages are encrypted end-to-end via XMTP protocol</li>
                             <li>• Works with MetaMask, WalletConnect, and other wallets</li>
                             <li>• No server required - purely peer-to-peer messaging</li>

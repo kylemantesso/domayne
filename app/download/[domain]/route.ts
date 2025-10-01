@@ -1,32 +1,15 @@
 import { NextRequest } from 'next/server'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ domain: string }> }
-) {
-  const { domain: rawDomain } = await params
-  const domain = decodeURIComponent(rawDomain)
-  const searchParams = request.nextUrl.searchParams
+interface DomainSettings {
+  title: string
+  description: string
+  price: string
+  currency: string
+  sellerAddress: string
+}
 
-  // Get pricing from URL parameters
-  const price = searchParams.get('price') || ''
-  const currency = searchParams.get('currency') || 'USD'
-
-  // Create settings object
-  const settings = {
-    title: `Buy ${domain} – A Premium Domain for Your Brand`,
-    description: `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`,
-    ownerName: `${domain} Owner`,
-    enableXMTP: true,
-    price,
-    currency,
-  }
-
-  const currencySymbol = settings.currency === 'USD' ? '$' : settings.currency === 'EUR' ? '€' : settings.currency === 'GBP' ? '£' : '$'
-
-  try {
-    // Generate static HTML directly as a string
-    const htmlContent = `<!DOCTYPE html>
+function generateStaticHTML(domain: string, settings: DomainSettings): string {
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -51,369 +34,119 @@ export async function GET(
     <!-- Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- XMTP SDK via ES modules with proper loading -->
-    <script type="module">
-      try {
-        console.log('Loading XMTP SDK from esm.sh...');
-        const XMTP = await import('https://esm.sh/@xmtp/xmtp-js@11.4.0');
-
-        // Make XMTP available globally
-        window.XMTP = XMTP;
-        window.xmtpLoaded = true;
-
-        console.log('XMTP SDK loaded successfully:', XMTP);
-        console.log('Available XMTP methods:', Object.keys(XMTP));
-
-        // Dispatch custom event to signal XMTP is ready
-        window.dispatchEvent(new CustomEvent('xmtp-loaded', { detail: XMTP }));
-      } catch (error) {
-        console.error('Failed to load XMTP SDK:', error);
-
-        // Try fallback CDN
-        try {
-          console.log('Trying fallback CDN...');
-          const XMTP = await import('https://cdn.skypack.dev/@xmtp/xmtp-js@11.4.0');
-
-          window.XMTP = XMTP;
-          window.xmtpLoaded = true;
-
-          console.log('XMTP SDK loaded from fallback CDN:', XMTP);
-          window.dispatchEvent(new CustomEvent('xmtp-loaded', { detail: XMTP }));
-        } catch (fallbackError) {
-          console.error('Fallback CDN also failed:', fallbackError);
-          window.xmtpLoadFailed = true;
-          window.dispatchEvent(new CustomEvent('xmtp-failed', { detail: fallbackError }));
-        }
-      }
-    </script>
-
     <script>
       // Global configuration
       window.domainSettings = {
         domain: "${domain}",
         sellerAddress: "${settings.sellerAddress || ''}",
-        sellerEns: "${settings.sellerEns || ''}",
-        enableXMTP: ${settings.enableXMTP !== false}
+        // Auto-detect API URL: use current origin if on domayne.xyz, otherwise use production
+        apiUrl: window.location.hostname.includes('domayne.xyz') || window.location.hostname === 'localhost' 
+          ? window.location.origin 
+          : "https://domayne.xyz"
       };
 
-      // Wait for XMTP to load via ES modules
-      function waitForXMTP() {
-        return new Promise((resolve, reject) => {
-          if (window.XMTP && window.xmtpLoaded) {
-            resolve(window.XMTP);
-            return;
-          }
-
-          // Listen for XMTP load event
-          const handleXMTPLoad = (event) => {
-            window.removeEventListener('xmtp-loaded', handleXMTPLoad);
-            resolve(event.detail);
-          };
-
-          // Listen for XMTP failure event too
-          const handleXMTPFail = (event) => {
-            window.removeEventListener('xmtp-loaded', handleXMTPLoad);
-            window.removeEventListener('xmtp-failed', handleXMTPFail);
-            reject(new Error('XMTP SDK failed to load: ' + event.detail.message));
-          };
-
-          window.addEventListener('xmtp-loaded', handleXMTPLoad);
-          window.addEventListener('xmtp-failed', handleXMTPFail);
-
-          // Fallback timeout
-          setTimeout(() => {
-            window.removeEventListener('xmtp-loaded', handleXMTPLoad);
-            window.removeEventListener('xmtp-failed', handleXMTPFail);
-            if (window.XMTP) {
-              resolve(window.XMTP);
-            } else {
-              reject(new Error('XMTP SDK failed to load - timeout after 10 seconds'));
-            }
-          }, 10000);
-        });
-      }
-
-      // XMTP state management
-      let xmtpClient = null;
-      let isConnected = false;
-      let currentConversation = null;
-
       function handleChatClick() {
-        if (!window.domainSettings.enableXMTP) return;
-        showXMTPModal();
-      }
-
-      function showXMTPModal() {
-        const modal = document.createElement('div');
-        modal.id = 'xmtp-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50';
-        modal.innerHTML = createModalHTML();
-        document.body.appendChild(modal);
-      }
-
-      function createModalHTML() {
-        return \`
-          <div class="bg-white rounded-lg w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between p-4 border-b">
-              <h3 class="text-lg font-semibold">Chat about \${window.domainSettings.domain}</h3>
-              <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div id="modal-content" class="flex-1 flex items-center justify-center p-6">
-              <div class="text-center">
-                <div class="text-4xl mb-4">🔗</div>
-                <h4 class="text-lg font-semibold mb-2">Connect Wallet</h4>
-                <p class="text-gray-600 mb-4">Connect your wallet to start messaging</p>
-                <button onclick="connectWallet()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                  Connect Wallet
-                </button>
-              </div>
-            </div>
-          </div>
-        \`;
-      }
-
-      function closeModal() {
-        const modal = document.getElementById('xmtp-modal');
-        if (modal) {
-          modal.remove();
-        }
-      }
-
-      async function connectWallet() {
-        if (typeof window.ethereum === 'undefined') {
-          alert('Please install MetaMask or another Web3 wallet to use XMTP chat.');
-          return;
-        }
-
-        try {
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <h4 class="text-lg font-semibold mb-2">Connecting Wallet</h4>
-              <p class="text-gray-600">Please approve the connection in your wallet</p>
-            </div>
-          \`);
-
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          const account = accounts[0];
-
-          await initializeXMTP(account);
-
-        } catch (error) {
-          console.error('Wallet connection failed:', error);
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="text-4xl mb-4">❌</div>
-              <h4 class="text-lg font-semibold mb-2 text-red-600">Connection Failed</h4>
-              <p class="text-gray-600 mb-4">\${error.message}</p>
-              <button onclick="connectWallet()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                Try Again
-              </button>
-            </div>
-          \`);
-        }
-      }
-
-      async function initializeXMTP(account) {
-        try {
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <h4 class="text-lg font-semibold mb-2">Initializing XMTP</h4>
-              <p class="text-gray-600">Setting up secure messaging...</p>
-            </div>
-          \`);
-
-          const XMTP = await waitForXMTP();
-
-          // Create a proper wallet instance for XMTP
-          const wallet = {
-            getAddress: async () => account,
-            signMessage: async (message) => {
-              return await window.ethereum.request({
-                method: 'personal_sign',
-                params: [message, account]
-              });
-            }
-          };
-
-          // Initialize XMTP client with proper wallet
-          xmtpClient = await XMTP.Client.create(wallet, { env: 'production' });
-          isConnected = true;
-
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="text-4xl mb-4">✅</div>
-              <h4 class="text-lg font-semibold mb-2 text-green-600">XMTP Ready!</h4>
-              <p class="text-gray-600 mb-4">You can now send secure messages</p>
-              <button onclick="startConversation()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-                Start Messaging
-              </button>
-            </div>
-          \`);
-
-        } catch (error) {
-          console.error('XMTP initialization failed:', error);
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="text-4xl mb-4">❌</div>
-              <h4 class="text-lg font-semibold mb-2 text-red-600">XMTP Failed</h4>
-              <p class="text-gray-600 mb-4">Could not initialize secure messaging</p>
-              <button onclick="connectWallet()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                Try Again
-              </button>
-            </div>
-          \`);
-        }
-      }
-
-      async function startConversation() {
-        if (!xmtpClient) {
-          alert('XMTP not initialized');
-          return;
-        }
-
         const sellerAddress = window.domainSettings.sellerAddress;
-        if (!sellerAddress) {
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="text-4xl mb-4">📧</div>
-              <h4 class="text-lg font-semibold mb-2">Contact Seller</h4>
-              <p class="text-gray-600 mb-4">No XMTP address configured. Please contact the seller directly.</p>
-              <button onclick="closeModal()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
-                Close
-              </button>
-            </div>
-          \`);
-          return;
-        }
-
-        try {
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
-              <h4 class="text-lg font-semibold mb-2">Starting Conversation</h4>
-              <p class="text-gray-600">Connecting with seller...</p>
-            </div>
-          \`);
-
-          currentConversation = await xmtpClient.conversations.newConversation(sellerAddress);
-
-          showChatInterface();
-
-        } catch (error) {
-          console.error('Failed to start conversation:', error);
-          updateModalContent(\`
-            <div class="text-center">
-              <div class="text-4xl mb-4">❌</div>
-              <h4 class="text-lg font-semibold mb-2 text-red-600">Connection Failed</h4>
-              <p class="text-gray-600 mb-4">Could not connect to seller</p>
-              <button onclick="startConversation()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-                Try Again
-              </button>
-            </div>
-          \`);
+        if (sellerAddress) {
+          window.open(\`https://domayne.xyz/chat/\${sellerAddress}\`, '_blank');
+        } else {
+          alert('No seller address configured for this domain.');
         }
       }
 
-      function showChatInterface() {
-        const modal = document.getElementById('xmtp-modal');
-        if (!modal) return;
-
-        modal.innerHTML = \`
-          <div class="bg-white rounded-lg w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between p-4 border-b">
-              <h3 class="text-lg font-semibold">Chat about \${window.domainSettings.domain}</h3>
-              <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div id="messages-container" class="flex-1 p-4 overflow-y-auto min-h-[300px] max-h-[400px]">
-              <div class="text-center text-gray-500 py-8">
-                <div class="text-4xl mb-2">👋</div>
-                <p>Say hello to start the conversation!</p>
-              </div>
-            </div>
-            <div class="border-t p-4">
-              <div class="flex gap-2">
-                <input
-                  id="message-input"
-                  type="text"
-                  placeholder="Type your message..."
-                  class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onkeypress="if(event.key==='Enter') sendMessage()"
-                />
-                <button
-                  onclick="sendMessage()"
-                  class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+      // Fetch Doma listing details dynamically
+      async function loadDomaListing() {
+        const domain = window.domainSettings.domain;
+        const loadingEl = document.getElementById('doma-loading');
+        const listingEl = document.getElementById('doma-listing');
+        const priceEl = document.getElementById('price-display');
+        const buttonsEl = document.getElementById('action-buttons');
+        
+        try {
+          const response = await fetch(\`\${window.domainSettings.apiUrl}/api/doma/check-listing?domain=\${encodeURIComponent(domain)}\`);
+          const data = await response.json();
+          
+          if (data.listing) {
+            const listing = data.listing;
+            
+            // Update price
+            if (priceEl) {
+              const currencySymbol = listing.currency === 'ETH' || listing.currency === 'WETH' ? '' : '$';
+              priceEl.innerHTML = \`
+                <div class="text-4xl font-bold text-blue-600 mb-2">
+                  \${currencySymbol}\${listing.price} \${listing.currency === 'ETH' || listing.currency === 'WETH' ? listing.currency : ''}
+                </div>
+              \`;
+            }
+            
+            // Update listing info
+            if (listingEl) {
+              listingEl.innerHTML = \`
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="font-semibold text-blue-800">Listed on Doma Protocol</span>
+                  </div>
+                  <div class="text-sm text-blue-700 space-y-1">
+                    <p><strong>Network:</strong> \${listing.network}</p>
+                    <p><strong>Token ID:</strong> \${listing.tokenId.slice(0, 10)}...</p>
+                    <p><strong>Listed:</strong> \${new Date(listing.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              \`;
+              listingEl.style.display = 'block';
+            }
+            
+            // Update buttons to show "Buy on Doma"
+            if (buttonsEl) {
+              const buyButton = \`
+                <a
+                  href="https://doma.xyz/domain/\${domain}"
+                  target="_blank"
+                  class="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
                   </svg>
+                  Buy on Doma
+                </a>
+              \`;
+              const chatButton = window.domainSettings.sellerAddress ? \`
+                <button
+                  onclick="handleChatClick()"
+                  class="chat-button inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-purple-700 transition-colors"
+                >
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                  </svg>
+                  Contact Seller
                 </button>
-              </div>
-            </div>
-          </div>
-        \`;
-      }
-
-      async function sendMessage() {
-        const input = document.getElementById('message-input');
-        if (!input || !input.value.trim() || !currentConversation) return;
-
-        const message = input.value.trim();
-        input.value = '';
-
-        try {
-          await currentConversation.send(message);
-          addMessageToChat(message, true);
+              \` : '';
+              buttonsEl.innerHTML = buyButton + chatButton;
+            }
+            
+            // Update seller address if available
+            if (listing.seller) {
+              window.domainSettings.sellerAddress = listing.seller;
+            }
+          }
         } catch (error) {
-          console.error('Failed to send message:', error);
-          alert('Failed to send message. Please try again.');
+          console.error('Failed to load Doma listing:', error);
+        } finally {
+          if (loadingEl) {
+            loadingEl.style.display = 'none';
+          }
         }
       }
 
-      function addMessageToChat(content, isSent) {
-        const container = document.getElementById('messages-container');
-        if (!container) return;
-
-        // Remove welcome message if it exists
-        const welcome = container.querySelector('.text-center.text-gray-500');
-        if (welcome) welcome.remove();
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = \`flex \${isSent ? 'justify-end' : 'justify-start'} mb-4\`;
-        messageDiv.innerHTML = \`
-          <div class="\${isSent ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-            <p class="text-sm">\${content}</p>
-            <p class="text-xs mt-1 opacity-70">\${new Date().toLocaleTimeString()}</p>
-          </div>
-        \`;
-
-        container.appendChild(messageDiv);
-        container.scrollTop = container.scrollHeight;
+      // Load listing when page loads
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadDomaListing);
+      } else {
+        loadDomaListing();
       }
-
-      function updateModalContent(html) {
-        const content = document.getElementById('modal-content');
-        if (content) {
-          content.innerHTML = html;
-        }
-      }
-
-      // Close modal when clicking backdrop
-      document.addEventListener('click', (e) => {
-        const modal = document.getElementById('xmtp-modal');
-        if (modal && e.target === modal) {
-          closeModal();
-        }
-      });
     </script>
 
     <style>
@@ -429,9 +162,6 @@ export async function GET(
       }
       .chat-button {
         transition: all 0.2s ease;
-      }
-      .modal-backdrop {
-        backdrop-filter: blur(4px);
       }
     </style>
   </head>
@@ -455,18 +185,20 @@ export async function GET(
             ${settings.description || `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`}
           </p>
 
-          ${settings.price ? `
-          <div class="text-4xl font-bold text-blue-600 mb-8">
-            ${currencySymbol}${settings.price}
+          <!-- Loading state -->
+          <div id="doma-loading" class="mb-8">
+            <div class="text-lg text-gray-500 animate-pulse">Loading listing details...</div>
           </div>
-          ` : ''}
 
-          <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button class="bg-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition-colors">
-              ${settings.price ? `Buy for ${currencySymbol}${settings.price}` : 'Make an Offer'}
-            </button>
+          <!-- Price display (populated dynamically) -->
+          <div id="price-display" class="mb-8"></div>
 
-            ${settings.enableXMTP !== false ? `
+          <!-- Doma listing details (populated dynamically) -->
+          <div id="doma-listing" class="mb-8" style="display: none;"></div>
+
+          <!-- Action buttons (populated dynamically) -->
+          <div id="action-buttons" class="flex justify-center gap-4">
+            ${settings.sellerAddress ? `
             <button
               onclick="handleChatClick()"
               class="chat-button inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-purple-700 transition-colors"
@@ -474,7 +206,7 @@ export async function GET(
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
               </svg>
-              Chat with Seller
+              Make an Offer
             </button>
             ` : ''}
           </div>
@@ -486,7 +218,7 @@ export async function GET(
         <div class="container mx-auto px-4">
           <div class="max-w-4xl mx-auto">
             <h2 class="text-3xl font-bold text-center mb-12">Why Choose ${domain}?</h2>
-            <div class="grid md:grid-cols-3 gap-8">
+            <div class="grid md:grid-cols-4 gap-8">
               <div class="text-center">
                 <div class="text-4xl mb-4">🎯</div>
                 <h3 class="text-xl font-semibold mb-2">Premium Domain</h3>
@@ -500,15 +232,82 @@ export async function GET(
               <div class="text-center">
                 <div class="text-4xl mb-4">💬</div>
                 <h3 class="text-xl font-semibold mb-2">Direct Communication</h3>
-                <p class="text-gray-600">Chat directly with the seller using XMTP</p>
+                <p class="text-gray-600">Chat directly with the seller</p>
+              </div>
+              <div class="text-center">
+                <div class="text-4xl mb-4">🔗</div>
+                <h3 class="text-xl font-semibold mb-2">Blockchain Verified</h3>
+                <p class="text-gray-600">Tokenized on Doma Protocol for secure ownership</p>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      <!-- Footer -->
+      <footer class="bg-gray-900 text-white py-12">
+        <div class="container mx-auto px-4">
+          <div class="max-w-4xl mx-auto">
+            <div class="grid md:grid-cols-3 gap-8">
+              <div>
+                <h3 class="text-lg font-semibold mb-4">About ${domain}</h3>
+                <p class="text-gray-400">Premium domain name available for purchase. Secure your brand with this memorable domain.</p>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold mb-4">Contact</h3>
+                <p class="text-gray-400 mb-2">Interested in purchasing?</p>
+                ${settings.sellerAddress ? `
+                <button onclick="handleChatClick()" class="text-purple-400 hover:text-purple-300 transition-colors">
+                  Make an offer →
+                </button>
+                ` : `
+                <p class="text-gray-400">Contact information not available</p>
+                `}
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold mb-4">Powered by</h3>
+                <p class="text-gray-400">Domayne - Premium Domain Marketplace</p>
+                <a href="https://domayne.xyz" class="text-blue-400 hover:text-blue-300 transition-colors" target="_blank">
+                  Visit Domayne →
+                </a>
+              </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+              <p>&copy; 2024 ${domain}. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   </body>
 </html>`
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ domain: string }> }
+) {
+  const { domain: rawDomain } = await params
+  const domain = decodeURIComponent(rawDomain)
+  const searchParams = request.nextUrl.searchParams
+
+  // Get parameters from URL
+  const price = searchParams.get('price') || ''
+  const currency = searchParams.get('currency') || 'USD'
+  const sellerAddress = searchParams.get('sellerAddress') || ''
+
+  // Create settings object (Doma listing will be fetched client-side)
+  const settings: DomainSettings = {
+    title: `Buy ${domain} – A Premium Domain for Your Brand`,
+    description: `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`,
+    price: price,
+    currency: currency,
+    sellerAddress: sellerAddress,
+  }
+
+  try {
+    // Generate static HTML directly as a string
+    const htmlContent = generateStaticHTML(domain, settings)
 
     const isDownload = searchParams.get('download') === 'true'
 

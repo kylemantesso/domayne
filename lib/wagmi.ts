@@ -19,9 +19,6 @@ export const config = getDefaultConfig({
     [sepolia.id]: http(),
   },
   ssr: true,
-  enableInjected: true,
-  enableWalletConnect: true,
-  enableCoinbase: true,
 });
 
 export const supportedChains = [sepolia] as const;
