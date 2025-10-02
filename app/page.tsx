@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe, AlertTriangle, ExternalLink, Edit } from "lucide-react";
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -147,14 +148,33 @@ export default function Home() {
             {/* Domain Input Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="example.xyz"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  className="h-20 !text-2xl bg-gray-800/80 border-gray-700 text-white placeholder:text-gray-400 rounded-2xl px-6 backdrop-blur-sm font-bold "
-                  autoFocus
-                />
+                {isConnected && isOnSepolia && ownedDomains.length > 0 ? (
+                  <Select value={domain} onValueChange={setDomain}>
+                    <SelectTrigger className="!h-20 !min-h-20 !text-2xl bg-gray-800/80 border-gray-700 text-white data-[placeholder]:text-gray-400 rounded-2xl !px-6 !py-0 backdrop-blur-sm font-bold w-full flex items-center justify-between">
+                      <SelectValue placeholder="Select your domain" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800/95 border-gray-700 text-white backdrop-blur-sm">
+                      {ownedDomains.map((ownedDomain, index) => (
+                        <SelectItem 
+                          key={index} 
+                          value={ownedDomain.domain}
+                          className="text-lg py-3 focus:bg-gray-700/80 focus:text-white"
+                        >
+                          {ownedDomain.domain}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type="text"
+                    placeholder="example.xyz"
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value)}
+                    className="h-20 !text-2xl bg-gray-800/80 border-gray-700 text-white placeholder:text-gray-400 rounded-2xl px-6 backdrop-blur-sm font-bold "
+                    autoFocus
+                  />
+                )}
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
