@@ -16,8 +16,52 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js + Supabase Starter",
-  description: "A modern web application with authentication",
+  title: "Domayne - Create A Landing Page For Your Domain",
+  description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://domayne.com'),
+  keywords: ["domain", "landing page", "web3", "blockchain", "domain management"],
+  authors: [{ name: "Domayne" }],
+  creator: "Domayne",
+  publisher: "Domayne",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    title: "Domayne - Create A Landing Page For Your Domain",
+    description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
+    url: "/",
+    siteName: "Domayne",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Domayne - Create A Landing Page For Your Domain",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Domayne - Create A Landing Page For Your Domain",
+    description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
+    images: ["/og.png"],
+    creator: "@domayne",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

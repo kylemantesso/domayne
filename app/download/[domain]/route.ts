@@ -48,7 +48,11 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       function handleChatClick() {
         const sellerAddress = window.domainSettings.sellerAddress;
         if (sellerAddress) {
-          window.open(\`https://domayne.xyz/chat/\${sellerAddress}\`, '_blank');
+          // Detect if we're on localhost for development
+          const chatUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? \`\${window.location.origin}/chat/\${sellerAddress}\`
+            : \`https://domayne.xyz/chat/\${sellerAddress}\`;
+          window.open(chatUrl, '_blank');
         } else {
           alert('No seller address configured for this domain.');
         }

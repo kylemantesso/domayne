@@ -90,7 +90,7 @@ export default function Home() {
         <div className="max-w-6xl relative">
           {/* Background Logo - Desktop Only */}
           <div
-            className="lg:block absolute md:left-[300px] md:bottom-[0px] md:w-[800px] md:h-[800px] bottom-[0px] w-[600px] h-[600px] left-[0px] opacity-15 pointer-events-none"
+            className="lg:block fixed md:left-[300px] md:bottom-[200px] md:w-[800px] md:h-[800px] bottom-[300px] w-[600px] h-[600px] left-[0px] opacity-15 pointer-events-none z-0"
             style={{
               backgroundImage: `url("/logo.svg")`,
               backgroundSize: 'contain',
