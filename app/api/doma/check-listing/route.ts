@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
           items {
             networkId
             ownerAddress
+            tokenAddress
           }
         }
       }
@@ -122,9 +123,10 @@ export async function GET(request: NextRequest) {
     const priceInWei = listing.price;
     const priceFormatted = (parseFloat(priceInWei) / Math.pow(10, decimals)).toFixed(4);
 
-    // Fetch token details to get network information
+    // Fetch token details to get network information and contract address
     let networkId: string | undefined = undefined;
     let sellerAddress = '';
+    let tokenAddress = '';
     
     try {
       const tokensResponse = await fetch('https://api-testnet.doma.xyz/graphql', {
@@ -145,6 +147,12 @@ export async function GET(request: NextRequest) {
         if (tokens && tokens.length > 0) {
           networkId = tokens[0].networkId;
           sellerAddress = tokens[0].ownerAddress || '';
+          tokenAddress = tokens[0].tokenAddress || '';
+          console.log('Token details:', {
+            networkId,
+            sellerAddress,
+            tokenAddress
+          });
         }
       }
     } catch (error) {
@@ -180,6 +188,7 @@ export async function GET(request: NextRequest) {
       price: priceFormatted,
       currency: listing.currency?.symbol || 'ETH',
       tokenId: listing.tokenId || '',
+      tokenAddress: tokenAddress,
       seller: sellerAddress,
       createdAt: listing.createdAt,
       network: formatNetworkName(networkId),

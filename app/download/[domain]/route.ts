@@ -34,8 +34,31 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
     <!-- Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Custom Styles -->
+    <style>
+      @keyframes float-bob {
+        0%, 100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-5px);
+        }
+      }
+      
+      .animate-bob {
+        animation: float-bob 3s ease-in-out infinite;
+      }
+    </style>
+    
     <!-- Web3 Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.14.1/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/viem@2/dist/viem.umd.js"></script>
+    <script type="module">
+      // Import Doma SDK
+      import { createDomaOrderbookClient, OrderbookType } from 'https://esm.sh/@doma-protocol/orderbook-sdk@latest';
+      window.createDomaOrderbookClient = createDomaOrderbookClient;
+      window.OrderbookType = OrderbookType;
+    </script>
 
     <script>
       // Global configuration
@@ -48,7 +71,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           : "https://domayne.xyz",
         walletConnected: false,
         currentAddress: null,
-        currentListing: null
+        currentListing: null,
+        provider: null
       };
 
       function handleChatClick() {
@@ -64,26 +88,63 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         }
       }
 
-      // Wallet connection functionality
-      async function connectWallet() {
-        if (typeof window.ethereum === 'undefined') {
-          alert('Please install MetaMask or another Web3 wallet to make an offer.');
-          return;
+      // Show wallet selection modal
+      function connectWallet() {
+        const modal = document.getElementById('wallet-modal');
+        if (modal) {
+          modal.style.display = 'flex';
+          setTimeout(() => modal.classList.add('show'), 10);
         }
+      }
 
+      // Hide wallet selection modal
+      function hideWalletModal() {
+        const modal = document.getElementById('wallet-modal');
+        if (modal) {
+          modal.classList.remove('show');
+          setTimeout(() => modal.style.display = 'none', 300);
+        }
+      }
+
+      // Connect to specific wallet
+      async function connectToWallet(walletType) {
         try {
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          const accounts = await provider.send('eth_requestAccounts', []);
-          const address = accounts[0];
+          let provider;
+          
+          if (walletType === 'metamask') {
+            if (typeof window.ethereum === 'undefined') {
+              window.open('https://metamask.io/download/', '_blank');
+              return;
+            }
+            provider = new ethers.BrowserProvider(window.ethereum);
+            await provider.send('eth_requestAccounts', []);
+          } else if (walletType === 'coinbase') {
+            if (typeof window.ethereum === 'undefined' || !window.ethereum.isCoinbaseWallet) {
+              window.open('https://www.coinbase.com/wallet', '_blank');
+              return;
+            }
+            provider = new ethers.BrowserProvider(window.ethereum);
+            await provider.send('eth_requestAccounts', []);
+          } else if (walletType === 'walletconnect') {
+            alert('WalletConnect: Please use MetaMask browser for now');
+            return;
+          }
+          
+          const signer = await provider.getSigner();
+          const address = await signer.getAddress();
           
           window.domainSettings.walletConnected = true;
           window.domainSettings.currentAddress = address;
+          window.domainSettings.provider = provider;
           
+          hideWalletModal();
           updateWalletUI();
-          showOfferModal();
+          try { await restoreOfferForConnectedWallet(); } catch {}
         } catch (error) {
           console.error('Failed to connect wallet:', error);
-          alert('Failed to connect wallet. Please try again.');
+          if (error.code !== 4001) { // Ignore user rejection
+            alert('Failed to connect wallet. Please try again.');
+          }
         }
       }
 
@@ -97,6 +158,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       function updateWalletUI() {
         const walletBtn = document.getElementById('wallet-button');
         const walletBtnMobile = document.getElementById('wallet-button-mobile');
+        const buttonsContainerDesktop = document.getElementById('action-buttons-desktop');
+        const buttonsContainerMobile = document.getElementById('action-buttons-mobile');
 
         if (window.domainSettings.walletConnected) {
           const address = window.domainSettings.currentAddress;
@@ -120,10 +183,50 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           if (walletBtn) {
             walletBtn.innerHTML = desktopHTML;
             walletBtn.onclick = disconnectWallet;
+            walletBtn.className = "action-btn inline-flex items-center gap-2 bg-gray-600 text-white px-6 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl";
           }
           if (walletBtnMobile) {
             walletBtnMobile.innerHTML = mobileHTML;
             walletBtnMobile.onclick = disconnectWallet;
+            walletBtnMobile.className = "action-btn inline-flex items-center gap-2 bg-gray-600 text-white px-6 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl";
+          }
+          
+          // Add Make Offer button if listing exists
+          if (window.domainSettings.currentListing) {
+            // Check if Make Offer button already exists
+            if (!document.getElementById('make-offer-button')) {
+              const makeOfferDesktop = \`
+                <button
+                  id="make-offer-button"
+                  onclick="showOfferModal()"
+                  class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
+                >
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Make an Offer
+                </button>
+              \`;
+              const makeOfferMobile = \`
+                <button
+                  id="make-offer-button-mobile"
+                  onclick="showOfferModal()"
+                  class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl"
+                >
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Make an Offer
+                </button>
+              \`;
+              
+              if (walletBtn && buttonsContainerDesktop) {
+                walletBtn.insertAdjacentHTML('afterend', makeOfferDesktop);
+              }
+              if (walletBtnMobile && buttonsContainerMobile) {
+                walletBtnMobile.insertAdjacentHTML('afterend', makeOfferMobile);
+              }
+            }
           }
         } else {
           const desktopHTML = \`
@@ -144,11 +247,19 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           if (walletBtn) {
             walletBtn.innerHTML = desktopHTML;
             walletBtn.onclick = connectWallet;
+            walletBtn.className = "action-btn inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl";
           }
           if (walletBtnMobile) {
             walletBtnMobile.innerHTML = mobileHTML;
             walletBtnMobile.onclick = connectWallet;
+            walletBtnMobile.className = "action-btn inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl";
           }
+          
+          // Remove Make Offer button if it exists
+          const makeOfferBtn = document.getElementById('make-offer-button');
+          const makeOfferBtnMobile = document.getElementById('make-offer-button-mobile');
+          if (makeOfferBtn) makeOfferBtn.remove();
+          if (makeOfferBtnMobile) makeOfferBtnMobile.remove();
         }
       }
 
@@ -169,8 +280,13 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       }
 
       async function submitOffer() {
-        if (!window.domainSettings.walletConnected) {
+        if (!window.domainSettings.walletConnected || !window.domainSettings.provider) {
           alert('Please connect your wallet first.');
+          return;
+        }
+
+        if (!window.createDomaOrderbookClient) {
+          alert('Doma SDK not loaded. Please refresh the page.');
           return;
         }
 
@@ -182,6 +298,12 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           return;
         }
 
+        const listing = window.domainSettings.currentListing;
+        if (!listing) {
+          alert('Listing information not available.');
+          return;
+        }
+
         const submitBtn = document.getElementById('submit-offer-btn');
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -190,17 +312,304 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
               <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="0.75"/>
             </svg>
-            Submitting...
+            Creating offer...
           \`;
         }
 
         try {
-          alert(\`Offer functionality coming soon! You offered: \${offerAmount} ETH for \${window.domainSettings.domain}\`);
+          console.log('[submitOffer] Step 1: Getting provider and signer');
+          const provider = window.domainSettings.provider;
+          const signer = await provider.getSigner(); // Make sure to await this
+          const signerAddress = await signer.getAddress();
+          const network = await provider.getNetwork();
+          
+          console.log('[submitOffer] Step 2: Provider info:', {
+            network: network.chainId,
+            signerAddress
+          });
+          console.log('[submitOffer] Step 3: Listing:', listing);
+          
+          // Validate we have contract address
+          if (!listing.tokenAddress) {
+            throw new Error('Missing contract address for domain');
+          }
+          
+          // Ensure tokenAddress is a string and not null
+          const contractAddress = String(listing.tokenAddress).trim();
+          const tokenIdStr = String(listing.tokenId).trim();
+          
+          if (!contractAddress || contractAddress === 'null' || contractAddress === 'undefined') {
+            throw new Error('Invalid contract address');
+          }
+          
+          if (!tokenIdStr || tokenIdStr === 'null' || tokenIdStr === 'undefined') {
+            throw new Error('Invalid token ID');
+          }
+          
+          // Convert price to wei
+          const priceInWei = ethers.parseEther(offerAmount).toString();
+          console.log('[submitOffer] Step 4: Offer amount in wei:', priceInWei);
+          
+          // Initialize Doma Orderbook client (same as create listing)
+          console.log('[submitOffer] Step 5: Initializing Doma client');
+          const client = window.createDomaOrderbookClient({
+            apiClientOptions: {
+              baseUrl: window.domainSettings.apiUrl + '/api/doma/proxy',
+            },
+            source: 'domayne',
+            chains: []
+          });
+          console.log('[submitOffer] Step 6: Client initialized');
+          
+          if (submitBtn) {
+            submitBtn.innerHTML = \`
+              <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="0.75"/>
+              </svg>
+              Signing offer...
+            \`;
+          }
+          
+          // WETH contract address on Sepolia testnet (fallback)
+          const wethAddress = '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14';
+          const zeroAddress = '0x0000000000000000000000000000000000000000';
+          
+          // Set expiration time to 30 days from now
+          const expirationTime = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+          
+          // Let SDK fetch marketplace fees automatically
+
+          // Ensure currency is supported; try resolving via SDK first
+          console.log('[submitOffer] Step 6.55: Fetching supported currencies...');
+          // Prefer WETH for offers (SDK validates ERC-20 balance)
+          let resolvedCurrencyAddress = wethAddress;
+          let resolvedCurrencySymbol = 'WETH';
+          try {
+            const currenciesResponse = await client.getSupportedCurrencies({
+              contractAddress: contractAddress,
+              orderbook: 'DOMA',
+              chainId: 'eip155:11155111'
+            });
+            console.log('[submitOffer] Supported currencies response:', currenciesResponse);
+            if (currenciesResponse && Array.isArray(currenciesResponse.currencies)) {
+              // Find WETH entry
+              const toEntry = (c) => ({
+                addr: (c && typeof c.contractAddress === 'string') ? c.contractAddress : '',
+                sym: (c && typeof c.symbol === 'string') ? c.symbol : ''
+              });
+              const entries = currenciesResponse.currencies.map(toEntry);
+              const wethEntry = entries.find((c) => c.sym.toUpperCase() === 'WETH' || c.addr.toLowerCase() === wethAddress.toLowerCase());
+              if (wethEntry) {
+                resolvedCurrencyAddress = wethEntry.addr || wethAddress;
+                resolvedCurrencySymbol = 'WETH';
+              }
+            }
+          } catch (currErr) {
+            console.warn('[submitOffer] Could not fetch supported currencies, using default WETH:', currErr);
+          }
+          
+          const normalizedContract = contractAddress.toLowerCase();
+          const normalizedCurrency = resolvedCurrencyAddress.toLowerCase();
+
+          // Fetch required marketplace fees (must include recipients)
+          console.log('[submitOffer] Step 6.6: Fetching marketplace fees...');
+          let marketplaceFees = [];
+          try {
+            const feeResponse = await client.getOrderbookFee({
+              contractAddress: normalizedContract,
+              orderbook: 'DOMA',
+              chainId: 'eip155:11155111'
+            });
+            if (feeResponse && Array.isArray(feeResponse.marketplaceFees)) {
+              marketplaceFees = feeResponse.marketplaceFees
+                .filter((f) => f && typeof f.recipient === 'string' && f.recipient && typeof f.basisPoints === 'number')
+                .map((f) => ({ recipient: f.recipient, basisPoints: f.basisPoints }));
+              console.log('[submitOffer] Step 6.7: Marketplace fees:', marketplaceFees);
+            }
+          } catch (feeErr) {
+            console.warn('[submitOffer] Could not fetch fees; offer may be rejected if required:', feeErr);
+          }
+
+          // If currency is WETH and balance is insufficient, auto-wrap needed difference
+          try {
+            if (resolvedCurrencySymbol === 'WETH') {
+              const priceInWeiBigInt = BigInt(priceInWei);
+              const erc20 = new ethers.Contract(normalizedCurrency, [
+                'function balanceOf(address) view returns (uint256)'
+              ], window.domainSettings.provider);
+              const currentWethBalance = await erc20.balanceOf(signerAddress);
+              console.log('[submitOffer] Current WETH balance:', currentWethBalance?.toString?.() ?? String(currentWethBalance));
+              if (currentWethBalance < priceInWeiBigInt) {
+                const deficit = priceInWeiBigInt - currentWethBalance;
+                const ethBalance = await window.domainSettings.provider.getBalance(signerAddress);
+                console.log('[submitOffer] ETH balance:', ethBalance?.toString?.() ?? String(ethBalance), 'Deficit:', deficit.toString());
+                if (ethBalance < deficit) {
+                  throw new Error('Insufficient ETH to wrap to WETH for offer amount');
+                }
+                console.log('[submitOffer] Wrapping ETH to WETH:', deficit.toString());
+                const weth = new ethers.Contract(normalizedCurrency, [
+                  'function deposit() payable'
+                ], signer);
+                const wrapTx = await weth.deposit({ value: deficit });
+                console.log('[submitOffer] Wrap tx sent:', wrapTx.hash);
+                await wrapTx.wait();
+                console.log('[submitOffer] Wrap tx confirmed');
+              }
+            }
+          } catch (wrapErr) {
+            console.warn('[submitOffer] Auto-wrap step failed or skipped:', wrapErr);
+          }
+
+          const offerParams = {
+            params: {
+              items: [{
+                contract: normalizedContract,
+                tokenId: tokenIdStr,
+                price: priceInWei,
+                currencyContractAddress: normalizedCurrency, // ETH uses zero address
+              }],
+              orderbook: 'DOMA',
+              expirationTime: expirationTime, // Offer expires in 30 days
+              ...(marketplaceFees.length > 0 ? { marketplaceFees } : {}),
+            },
+            signer,
+            chainId: 'eip155:11155111', // Sepolia
+            onProgress: (step, progress) => {
+              console.log('[submitOffer] Progress:', step, progress);
+            }
+          };
+          
+          console.log('[submitOffer] Step 7: Creating offer with params:', {
+            contract: normalizedContract,
+            tokenId: tokenIdStr,
+            price: priceInWei,
+            currencyContractAddress: normalizedCurrency,
+            orderbook: 'DOMA',
+            chainId: 'eip155:11155111',
+            expirationTime: expirationTime,
+            signerAddress: signerAddress,
+            itemsCount: 1
+          });
+          try { console.log('[submitOffer] Offer params full:', JSON.stringify(offerParams)); } catch {}
+          
+          // Step 8: Create and sign the offer with SDK
+          console.log('[submitOffer] Step 8: Calling client.createOffer...');
+          const sdkResult = await client.createOffer(offerParams);
+          
+          console.log('[submitOffer] Step 9: Offer signed:', sdkResult);
+          
+          if (!sdkResult || sdkResult.errors) {
+            throw new Error(sdkResult?.errors ? JSON.stringify(sdkResult.errors) : 'Failed to sign offer');
+          }
+          
+          // Step 10: Determine if SDK already submitted (proxy flow) or if we need to submit
+          console.log('[submitOffer] Step 10: Preparing submission payload...');
+          if (sdkResult && Array.isArray(sdkResult.orders) && sdkResult.orders.length > 0) {
+            const firstOrder = sdkResult.orders[0];
+            const orderId = firstOrder?.orderId || firstOrder?.order?.orderId;
+            if (orderId) {
+          console.log('[submitOffer] SDK handled submission via proxy. Order ID:', orderId);
+          try {
+            const offerRecord = {
+              orderId,
+              domain: window.domainSettings.domain,
+              contract: normalizedContract,
+              tokenId: tokenIdStr,
+              priceWei: priceInWei,
+              currency: 'WETH',
+              createdAt: Date.now(),
+              chainId: 'eip155:11155111',
+              maker: signerAddress
+            };
+            const key = 'doma_offer_' + window.domainSettings.domain + '_' + signerAddress;
+            localStorage.setItem(key, JSON.stringify(offerRecord));
+          } catch {}
+          renderYourOfferSection({ orderId });
           hideOfferModal();
           if (offerInput) offerInput.value = '';
+          return;
+            }
+          }
+
+          let signedParameters = undefined;
+          let signedSignature = undefined;
+          try {
+            if (sdkResult && Array.isArray(sdkResult.orders) && sdkResult.orders.length > 0) {
+              const firstOrder = sdkResult.orders[0];
+              signedParameters = firstOrder?.parameters || firstOrder?.order?.parameters;
+              signedSignature = firstOrder?.signature || firstOrder?.order?.signature;
+              console.log('[submitOffer] Extracted from orders[0]');
+            }
+            if (!signedParameters || !signedSignature) {
+              const stepBody = sdkResult?.steps?.[0]?.items?.[0]?.data?.post?.body;
+              if (stepBody) {
+                signedParameters = stepBody.parameters;
+                signedSignature = stepBody.signature;
+                console.log('[submitOffer] Extracted from steps[0] body');
+              }
+            }
+          } catch (extractErr) {
+            console.warn('[submitOffer] Could not extract signed payload from SDK result:', extractErr);
+          }
+
+          if (!signedParameters || !signedSignature) {
+            console.error('[submitOffer] Missing signed payload. SDK result:', sdkResult);
+            throw new Error('SDK did not return signed order payload');
+          }
+
+          console.log('[submitOffer] Step 10: Submitting to backend...');
+          if (submitBtn) {
+            submitBtn.innerHTML = \`
+              <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="0.75"/>
+              </svg>
+              Submitting offer...
+            \`;
+          }
+          
+          const backendResponse = await fetch(\`\${window.domainSettings.apiUrl}/api/doma/submit-order\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderbook: 'DOMA',
+              chainId: 'eip155:11155111',
+              parameters: signedParameters,
+              signature: signedSignature,
+              domain: window.domainSettings.domain
+            })
+          });
+          
+          const backendData = await backendResponse.json();
+          console.log('[submitOffer] Step 11: Backend response:', backendData);
+          
+          if (!backendResponse.ok || !backendData.success) {
+            throw new Error(backendData.error || backendData.details || 'Failed to submit offer to backend');
+          }
+          
+          alert(\`Offer submitted successfully!\\n\\nYour offer of \${offerAmount} ETH for \${window.domainSettings.domain} has been created.\`);
+          hideOfferModal();
+          if (offerInput) offerInput.value = '';
+          
         } catch (error) {
-          console.error('Failed to submit offer:', error);
-          alert('Failed to submit offer. Please try again.');
+          console.error('[submitOffer] ERROR - Full error object:', error);
+          console.error('[submitOffer] ERROR - Error message:', error?.message);
+          console.error('[submitOffer] ERROR - Error code:', error?.code);
+          console.error('[submitOffer] ERROR - Error stack:', error?.stack);
+          try { console.error('[submitOffer] ERROR - keys:', Object.keys(error || {})); } catch {}
+          try { console.error('[submitOffer] ERROR - details:', error?.details || error?.data || error?.cause || null); } catch {}
+          
+          let errorMessage = 'Failed to create offer: ';
+          if (error.code === 4001) {
+            errorMessage += 'You rejected the signature request.';
+          } else if (error.message) {
+            errorMessage += error.message;
+          } else {
+            errorMessage += 'Unknown error. Check console for details.';
+          }
+          
+          alert(errorMessage);
         } finally {
           if (submitBtn) {
             submitBtn.disabled = false;
@@ -237,7 +646,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             \`;
             
             const listingHTML = \`
-              <div class="relative max-w-md mx-auto group">
+              <div class="relative max-w-md mx-auto group animate-bob">
                 <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl opacity-75 blur group-hover:opacity-100 transition duration-300"></div>
                 <div class="relative bg-white rounded-2xl p-6 shadow-xl">
                   <div class="flex items-center justify-center gap-2 mb-4">
@@ -248,7 +657,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                       Listed on Doma Protocol
                     </span>
                   </div>
-                  <div class="grid gap-3">
+                  <div class="grid gap-3 mb-4">
                     <div class="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                       <span class="text-sm font-medium text-gray-600">Network:</span>
                       <span class="text-sm font-bold text-gray-900">\${listing.network}</span>
@@ -261,6 +670,18 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                       <span class="text-sm font-medium text-gray-600">Listed:</span>
                       <span class="text-sm font-bold text-gray-900">\${new Date(listing.createdAt).toLocaleDateString()}</span>
                     </div>
+                  </div>
+                  <div class="text-center pt-2 border-t border-gray-200">
+                    <a
+                      href="https://doma.xyz/domain/\${domain}"
+                      target="_blank"
+                      class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold transition-colors text-sm"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
+                      </svg>
+                      Buy Now on Doma
+                    </a>
                   </div>
                 </div>
               </div>
@@ -294,7 +715,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               \`;
             }
             
-            // Update buttons to show "Make Offer" and "Buy on Doma"
+            // Update buttons to show "Make Offer" and "Contact Seller"
             const walletButton = \`
               <button
                 id="wallet-button"
@@ -307,18 +728,6 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Connect Wallet
               </button>
-            \`;
-            const buyButton = \`
-              <a
-                href="https://doma.xyz/domain/\${domain}"
-                target="_blank"
-                class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
-              >
-                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
-                </svg>
-                Buy Now on Doma
-              </a>
             \`;
             const chatButton = window.domainSettings.sellerAddress ? \`
               <button
@@ -345,18 +754,6 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 Connect Wallet
               </button>
             \`;
-            const mobileBuyButton = \`
-              <a
-                href="https://doma.xyz/domain/\${domain}"
-                target="_blank"
-                class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl"
-              >
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
-                </svg>
-                Buy Now on Doma
-              </a>
-            \`;
             const mobileChatButton = window.domainSettings.sellerAddress ? \`
               <button
                 onclick="handleChatClick()"
@@ -369,8 +766,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               </button>
             \` : '';
             
-            if (buttonsElDesktop) buttonsElDesktop.innerHTML = walletButton + buyButton + chatButton;
-            if (buttonsElMobile) buttonsElMobile.innerHTML = mobileWalletButton + mobileBuyButton + mobileChatButton;
+            if (buttonsElDesktop) buttonsElDesktop.innerHTML = walletButton + chatButton;
+            if (buttonsElMobile) buttonsElMobile.innerHTML = mobileWalletButton + mobileChatButton;
             
             // Re-initialize wallet button after updating
             updateWalletUI();
@@ -391,6 +788,16 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </button>
               \`;
             }
+
+            // Render saved offer if present for this wallet
+            try {
+              const key = 'doma_offer_' + domain + '_' + window.domainSettings.currentAddress;
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                renderYourOfferSection(parsed);
+              }
+            } catch {}
           }
         } catch (error) {
           console.error('Failed to load Doma listing:', error);
@@ -405,6 +812,45 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         document.addEventListener('DOMContentLoaded', loadDomaListing);
       } else {
         loadDomaListing();
+      }
+
+      function renderYourOfferSection(existing) {
+        try {
+          const containerDesktop = document.getElementById('action-buttons-desktop');
+          const containerMobile = document.getElementById('action-buttons-mobile');
+          if (!containerDesktop && !containerMobile) return;
+          const orderId = existing?.orderId;
+          const price = existing?.priceWei ? (Number(existing.priceWei) / 1e18).toString() : null;
+          const inner = '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/></svg>'
+            + '<div class="text-sm font-semibold">Your offer is active' + (price ? (': ' + price + ' WETH') : '') + '</div>'
+            + (orderId ? ('<a target="_blank" href="https://dashboard-testnet.doma.xyz/domain/' + window.domainSettings.domain + '" class="text-emerald-700 underline">View</a>') : '');
+          if (containerDesktop) {
+            const existingDesktop = document.getElementById('your-offer-desktop');
+            if (existingDesktop) existingDesktop.remove();
+            const htmlDesktop = '<div id="your-offer-desktop" class="w-full mb-3 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl">' + inner + '</div>';
+            containerDesktop.insertAdjacentHTML('afterbegin', htmlDesktop);
+          }
+          if (containerMobile) {
+            const existingMobile = document.getElementById('your-offer-mobile');
+            if (existingMobile) existingMobile.remove();
+            const htmlMobile = '<div id="your-offer-mobile" class="w-full mb-3 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl">' + inner + '</div>';
+            containerMobile.insertAdjacentHTML('afterbegin', htmlMobile);
+          }
+        } catch {}
+      }
+
+      async function restoreOfferForConnectedWallet() {
+        try {
+          const domain = window.domainSettings.domain;
+          const address = window.domainSettings.currentAddress;
+          if (!domain || !address) return;
+          const key = 'doma_offer_' + domain + '_' + address;
+          const raw = localStorage.getItem(key);
+          if (!raw) return;
+          const offer = JSON.parse(raw);
+          // Optionally, validate offer via API or just render locally
+          renderYourOfferSection(offer);
+        } catch {}
       }
     </script>
 
@@ -639,6 +1085,120 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           </div>
         </div>
       </main>
+
+      <!-- Wallet Selection Modal -->
+      <div id="wallet-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 p-4" style="display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;">
+        <div class="relative group max-w-md w-full" onclick="event.stopPropagation()">
+          <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-3xl opacity-75 blur"></div>
+          <div class="relative bg-white rounded-3xl p-8 shadow-2xl">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Connect Wallet</h2>
+              <button onclick="hideWalletModal()" class="text-gray-400 hover:text-gray-600 transition-colors hover:rotate-90 transform duration-200">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <p class="text-gray-600 mb-6">Choose your preferred wallet to connect</p>
+
+            <div class="space-y-3">
+              <!-- MetaMask -->
+              <button
+                onclick="connectToWallet('metamask')"
+                class="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+              >
+                <div class="w-12 h-12 flex items-center justify-center bg-orange-100 rounded-xl group-hover:scale-110 transition-transform">
+                  <svg class="w-8 h-8" viewBox="0 0 40 40" fill="none">
+                    <path d="M32.5 4L20 12.5L22.3 7.2L32.5 4Z" fill="#E17726"/>
+                    <path d="M7.5 4L19.9 12.6L17.7 7.2L7.5 4Z" fill="#E27625"/>
+                    <path d="M28.3 28.7L25.5 33.2L32 35L34.1 28.8L28.3 28.7Z" fill="#E27625"/>
+                    <path d="M5.9 28.8L8 35L14.5 33.2L11.7 28.7L5.9 28.8Z" fill="#E27625"/>
+                    <path d="M14.2 17.5L12.2 20.5L18.7 20.8L18.5 13.8L14.2 17.5Z" fill="#E27625"/>
+                    <path d="M25.8 17.5L21.4 13.7L21.3 20.8L27.8 20.5L25.8 17.5Z" fill="#E27625"/>
+                    <path d="M14.5 33.2L18.1 31.5L15 28.8L14.5 33.2Z" fill="#E27625"/>
+                    <path d="M21.9 31.5L25.5 33.2L25 28.8L21.9 31.5Z" fill="#E27625"/>
+                  </svg>
+                </div>
+                <div class="flex-1 text-left">
+                  <div class="font-bold text-gray-900">MetaMask</div>
+                  <div class="text-sm text-gray-500">Connect using MetaMask</div>
+                </div>
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </button>
+
+              <!-- Coinbase Wallet -->
+              <button
+                onclick="connectToWallet('coinbase')"
+                class="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+              >
+                <div class="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-xl group-hover:scale-110 transition-transform">
+                  <svg class="w-8 h-8" viewBox="0 0 1024 1024" fill="none">
+                    <circle cx="512" cy="512" r="512" fill="#0052FF"/>
+                    <path d="M512 692C406.5 692 332 617.5 332 512C332 406.5 406.5 332 512 332C617.5 332 692 406.5 692 512C692 617.5 617.5 692 512 692Z" fill="white"/>
+                  </svg>
+                </div>
+                <div class="flex-1 text-left">
+                  <div class="font-bold text-gray-900">Coinbase Wallet</div>
+                  <div class="text-sm text-gray-500">Connect using Coinbase</div>
+                </div>
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </button>
+
+              <!-- WalletConnect -->
+              <button
+                onclick="connectToWallet('walletconnect')"
+                class="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group opacity-50 cursor-not-allowed"
+                disabled
+              >
+                <div class="w-12 h-12 flex items-center justify-center bg-purple-100 rounded-xl">
+                  <svg class="w-8 h-8" viewBox="0 0 300 185" fill="none">
+                    <path d="M61.439 36.256c48.91-47.888 128.212-47.888 177.123 0l5.886 5.764a6.041 6.041 0 0 1 0 8.67l-20.136 19.716a3.179 3.179 0 0 1-4.428 0l-8.101-7.931c-34.122-33.408-89.444-33.408-123.566 0l-8.675 8.494a3.179 3.179 0 0 1-4.428 0L54.978 51.253a6.041 6.041 0 0 1 0-8.67l6.46-6.327ZM280.206 77.03l17.922 17.547a6.041 6.041 0 0 1 0 8.67l-80.81 79.122c-2.446 2.394-6.41 2.394-8.857 0l-57.354-56.155a1.59 1.59 0 0 0-2.214 0L91.54 182.37c-2.446 2.394-6.41 2.394-8.857 0L1.872 103.247a6.041 6.041 0 0 1 0-8.67l17.922-17.547c2.445-2.394 6.41-2.394 8.856 0l57.355 56.155a1.59 1.59 0 0 0 2.214 0L145.57 77.03c2.446-2.394 6.41-2.395 8.856 0l57.355 56.155a1.59 1.59 0 0 0 2.214 0L271.35 77.03c2.446-2.394 6.41-2.394 8.856 0Z" fill="#3B99FC"/>
+                  </svg>
+                </div>
+                <div class="flex-1 text-left">
+                  <div class="font-bold text-gray-900">WalletConnect</div>
+                  <div class="text-sm text-gray-500">Coming soon</div>
+                </div>
+              </button>
+            </div>
+
+            <p class="text-xs text-gray-500 text-center mt-6">
+              By connecting a wallet, you agree to the Terms of Service
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        #wallet-modal.show {
+          opacity: 1 !important;
+        }
+        #wallet-modal {
+          cursor: pointer;
+        }
+        #wallet-modal > div {
+          cursor: default;
+        }
+      </style>
+
+      <script>
+        // Close modal when clicking backdrop
+        document.addEventListener('DOMContentLoaded', function() {
+          const walletModal = document.getElementById('wallet-modal');
+          if (walletModal) {
+            walletModal.addEventListener('click', function(e) {
+              if (e.target === walletModal) {
+                hideWalletModal();
+              }
+            });
+          }
+        });
+      </script>
 
       <!-- Offer Modal -->
       <div id="offer-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 p-4" style="display: none; align-items: center; justify-content: center;">

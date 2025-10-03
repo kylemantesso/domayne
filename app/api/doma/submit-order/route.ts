@@ -1,18 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { addOffer, getOffersByMaker } from '@/server/store/offers';
+
+// CORS headers for allowing static sites to submit orders
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const maker = (url.searchParams.get('maker') || '').toLowerCase();
+  if (!maker) {
+    return NextResponse.json({ error: 'maker is required' }, { status: 400, headers: corsHeaders });
+  }
+  try {
+    const list = getOffersByMaker(maker);
+    return NextResponse.json({ offers: list }, { headers: corsHeaders });
+  } catch {
+    return NextResponse.json({ error: 'failed to fetch offers' }, { status: 500, headers: corsHeaders });
+  }
+}
 
 /**
- * Proxy endpoint to submit signed orders to Doma orderbook
- * This keeps the ORDERBOOK API key secure on the backend
+ * Submit a signed offer to Doma orderbook
+ * The frontend uses the SDK to create and sign the offer, then sends it here
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderData, chainId } = body;
+    const { orderbook, chainId, parameters, signature, domain } = body;
 
-    if (!orderData) {
+    // Validate required fields
+    if (!orderbook || !chainId || !parameters || !signature) {
       return NextResponse.json(
-        { error: 'Order data is required' },
-        { status: 400 }
+        { error: 'Missing required fields: orderbook, chainId, parameters, signature' },
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -22,48 +49,68 @@ export async function POST(request: NextRequest) {
       console.error('DOMA_API_KEY not configured');
       return NextResponse.json(
         { error: 'Server configuration error: Missing API key' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
-    console.log('Submitting order to Doma orderbook...');
+    console.log('Submitting signed offer to Doma API...');
+    console.log('Offer details:', { orderbook, chainId, domain });
 
-    // Submit the order to Doma's orderbook API
-    const response = await fetch('https://api-testnet.doma.xyz/v1/orderbook/orders', {
+    // Call Doma Orderbook API to submit the offer
+    const domaResponse = await fetch('https://api-testnet.doma.xyz/v1/orderbook/offer', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Api-Key': apiKey,
-        ...(chainId && { 'X-Chain-Id': chainId }),
       },
-      body: JSON.stringify(orderData)
+      body: JSON.stringify({
+        orderbook,
+        chainId,
+        parameters,
+        signature,
+      }),
     });
 
-    const responseText = await response.text();
-    console.log('Doma API response status:', response.status);
-
-    if (!response.ok) {
-      console.error('Doma order submission failed:', responseText);
-      return NextResponse.json({
-        success: false,
-        error: `Doma API request failed with status ${response.status}`,
-        details: responseText
-      }, { status: response.status });
+    if (!domaResponse.ok) {
+      const errorData = await domaResponse.json().catch(() => ({}));
+      console.error('Doma API error:', domaResponse.status, errorData);
+      console.error('Request payload:', { orderbook, chainId, parameters, signature });
+      
+      return NextResponse.json(
+        { 
+          error: `Doma API error: ${domaResponse.status}`,
+          details: errorData.message || errorData.details || errorData || 'Unknown error'
+        },
+        { status: domaResponse.status, headers: corsHeaders }
+      );
     }
 
-    const result = JSON.parse(responseText);
+    const responseData = await domaResponse.json();
     
+    // Log successful offer creation
+    console.log(`Successfully created Doma offer for ${domain}:`, responseData);
+
+    try {
+      addOffer({
+        orderId: String(responseData.offerId || responseData.id || ''),
+        maker: (parameters?.offerer || ''),
+        chainId,
+        params: parameters,
+        createdAt: Date.now(),
+      });
+    } catch {}
+
     return NextResponse.json({
       success: true,
-      order: result,
-      message: 'Successfully submitted order to Doma'
-    });
+      offerId: responseData.offerId || responseData.id,
+      domain,
+    }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('Error submitting order to Doma:', error);
+    console.error('Error submitting offer:', error);
     return NextResponse.json(
       { error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error') },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

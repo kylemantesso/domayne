@@ -55,7 +55,24 @@ async function handleProxyRequest(
     // Build the target URL
     const path = pathSegments ? pathSegments.join('/') : '';
     const searchParams = request.nextUrl.searchParams.toString();
-    const targetUrl = `https://api-testnet.doma.xyz/${path}${searchParams ? `?${searchParams}` : ''}`;
+    
+    // Special handling for fee endpoint - SDK might not include contract in path
+    // Fee endpoint format: /v1/orderbook/fee/{orderbook}/{chainId}/{contractAddress}
+    let targetUrl = `https://api-testnet.doma.xyz/${path}${searchParams ? `?${searchParams}` : ''}`;
+    
+    // If calling fee endpoint without contract address in path, try to get from query params
+    if (path.match(/^v1\/orderbook\/fee\/[^\/]+\/[^\/]+$/)) {
+      const contractParam = request.nextUrl.searchParams.get('contract') || 
+                           request.nextUrl.searchParams.get('contractAddress');
+      if (contractParam) {
+        targetUrl = `https://api-testnet.doma.xyz/${path}/${contractParam}`;
+        console.log(`[Doma Proxy] Fixed fee URL with contract from query param`);
+      } else {
+        console.warn(`[Doma Proxy] Fee endpoint called without contract address`);
+        // Return empty fees to allow SDK to continue
+        return NextResponse.json({ marketplaceFees: [] }, { status: 200 });
+      }
+    }
 
     console.log(`[Doma Proxy] ${request.method} ${targetUrl}`);
 
@@ -96,7 +113,40 @@ async function handleProxyRequest(
     const response = await fetch(targetUrl, requestOptions);
 
     // Get response body
-    const responseText = await response.text();
+    let responseText = await response.text();
+
+    // If this looks like a JSON with marketplaceFees, sanitize null recipients
+    try {
+      const urlLower = targetUrl.toLowerCase();
+      const isJson = response.headers.get('Content-Type')?.includes('application/json');
+      if (response.ok && isJson) {
+        const json = JSON.parse(responseText);
+        // Sanitize fees
+        if (urlLower.includes('/orderbook/fee') || urlLower.includes('/v1/orderbook/fee')) {
+          if (json && Array.isArray(json.marketplaceFees)) {
+            json.marketplaceFees = json.marketplaceFees.filter((f: { recipient?: unknown }) => typeof f?.recipient === 'string' && (f as { recipient: string }).recipient);
+          }
+        }
+        // Sanitize currencies: ensure contractAddress is a non-empty string; map null/undefined to zero address
+        if (urlLower.includes('/orderbook/currencies') || urlLower.includes('/v1/orderbook/currencies')) {
+          if (json && Array.isArray(json.currencies)) {
+            const ZERO = '0x0000000000000000000000000000000000000000';
+            json.currencies = json.currencies
+              .filter((c: { symbol?: unknown }) => typeof c?.symbol === 'string')
+              .map((c: { contractAddress?: unknown; symbol?: unknown } & Record<string, unknown>) => ({
+                ...c,
+                contractAddress: (typeof c.contractAddress === 'string' && c.contractAddress)
+                  ? (c.contractAddress as string)
+                  : ZERO,
+                symbol: String(c.symbol as string)
+              }));
+          }
+        }
+        responseText = JSON.stringify(json);
+      }
+    } catch {
+      // noop: if sanitization fails, return original response
+    }
 
     // Log for debugging
     if (!response.ok) {
