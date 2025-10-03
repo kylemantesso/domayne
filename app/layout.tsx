@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Domayne - Create A Landing Page For Your Domain",
   description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://domaybe.xyz'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://domayne.xyz'),
   keywords: ["domain", "landing page", "web3", "blockchain", "domain management"],
   authors: [{ name: "Domayne" }],
   creator: "Domayne",
