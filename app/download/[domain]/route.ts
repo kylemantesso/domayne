@@ -258,22 +258,22 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 <button
                   id="wallet-button"
                   onclick="connectWallet()"
-                  class="inline-flex items-center gap-2 bg-green-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-green-700 transition-colors"
+                  class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
                 >
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
                     <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
                   </svg>
-                  Make an Offer
+                  Connect Wallet
                 </button>
               \`;
               const buyButton = \`
                 <a
                   href="https://doma.xyz/domain/\${domain}"
                   target="_blank"
-                  class="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-blue-700 transition-colors"
+                  class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
                 >
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
                   </svg>
                   Buy Now on Doma
@@ -282,9 +282,9 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               const chatButton = window.domainSettings.sellerAddress ? \`
                 <button
                   onclick="handleChatClick()"
-                  class="chat-button inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-purple-700 transition-colors"
+                  class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
                 >
-                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                   </svg>
                   Contact Seller
@@ -336,13 +336,6 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       .gradient-bg {
         background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
       }
-      .chat-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      }
-      .chat-button {
-        transition: all 0.2s ease;
-      }
       @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-5px); }
@@ -350,25 +343,80 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       #doma-listing > div {
         animation: float 3s ease-in-out infinite;
       }
+      @keyframes gradient-shift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+      }
+      .animated-gradient {
+        background-size: 200% 200%;
+        animation: gradient-shift 3s ease infinite;
+      }
+      .action-btn {
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .action-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+      }
+      .action-btn:hover::before {
+        left: 100%;
+      }
+      .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      }
+      .feature-card {
+        transition: all 0.3s ease;
+      }
+      .feature-card:hover {
+        transform: translateY(-5px);
+      }
     </style>
   </head>
   <body class="gradient-bg">
-    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <!-- Header -->
-      <header class="bg-white shadow-sm border-b">
-        <div class="container mx-auto px-4 py-4">
-          <h1 class="text-2xl font-bold text-gray-900">${domain}</h1>
+      <header class="bg-white/80 backdrop-blur-md shadow-lg border-b border-gray-200 sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-5">
+          <div class="flex items-center justify-between">
+            <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              ${domain}
+            </h1>
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+              </svg>
+              <span class="font-medium">Available</span>
+            </div>
+          </div>
         </div>
       </header>
 
       <!-- Hero Section -->
-      <main class="container mx-auto px-4 py-16">
-        <div class="max-w-4xl mx-auto text-center">
-          <h1 class="text-5xl md:text-7xl font-bold text-gray-900 mb-6">
-            <span class="text-blue-600">${domain}</span> is available!
+      <main class="container mx-auto px-4 py-12 md:py-20">
+        <div class="max-w-5xl mx-auto text-center">
+          <div class="inline-block mb-6">
+            <span class="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full shadow-lg">
+              Premium Domain
+            </span>
+          </div>
+          
+          <h1 class="text-5xl md:text-8xl font-black mb-6 leading-tight">
+            <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animated-gradient">
+              ${domain}
+            </span>
+            <div class="text-3xl md:text-5xl mt-4 text-gray-700">is available!</div>
           </h1>
 
-          <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          <p class="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
             ${settings.description || `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`}
           </p>
 
@@ -384,14 +432,14 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           <div id="doma-listing" class="mb-8" style="display: none;"></div>
 
           <!-- Action buttons (populated dynamically) -->
-          <div id="action-buttons" class="flex flex-wrap justify-center gap-4">
+          <div id="action-buttons" class="flex flex-wrap justify-center gap-4 md:gap-6">
             <!-- Buttons will be populated dynamically based on listing status -->
             ${settings.sellerAddress ? `
             <button
               onclick="handleChatClick()"
-              class="chat-button inline-flex items-center gap-2 bg-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-purple-700 transition-colors"
+              class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
             >
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
               </svg>
               Contact Seller
@@ -402,79 +450,103 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       </main>
 
       <!-- Offer Modal -->
-      <div id="offer-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 p-4" style="display: none; align-items: center; justify-content: center;">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold text-gray-900">Make an Offer</h2>
-            <button onclick="hideOfferModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
+      <div id="offer-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 p-4" style="display: none; align-items: center; justify-content: center;">
+        <div class="relative group max-w-md w-full">
+          <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-3xl opacity-75 blur"></div>
+          <div class="relative bg-white rounded-3xl p-8 shadow-2xl">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Make an Offer</h2>
+              <button onclick="hideOfferModal()" class="text-gray-400 hover:text-gray-600 transition-colors hover:rotate-90 transform duration-200">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
 
-          <div class="mb-6">
-            <p class="text-gray-600 mb-4">Submit your offer for <strong class="text-gray-900">${domain}</strong></p>
-            
-            <div id="listing-info-modal" class="mb-4"></div>
+            <div class="mb-6">
+              <p class="text-gray-600 mb-4">Submit your offer for <strong class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">${domain}</strong></p>
+              
+              <div id="listing-info-modal" class="mb-4"></div>
 
-            <label class="block text-sm font-medium text-gray-700 mb-2">Your Offer (ETH)</label>
-            <input
-              type="number"
-              id="offer-amount"
-              placeholder="0.1"
-              step="0.01"
-              min="0"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-            />
-            <p class="text-xs text-gray-500 mt-2">
-              Enter your offer amount in ETH. The seller will be notified and can accept, reject, or counter your offer.
-            </p>
-          </div>
+              <label class="block text-sm font-bold text-gray-700 mb-3">Your Offer (ETH)</label>
+              <div class="relative">
+                <input
+                  type="number"
+                  id="offer-amount"
+                  placeholder="0.1"
+                  step="0.01"
+                  min="0"
+                  class="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold transition-all"
+                />
+              </div>
+              <p class="text-xs text-gray-500 mt-3">
+                Enter your offer amount in ETH. The seller will be notified and can accept, reject, or counter your offer.
+              </p>
+            </div>
 
-          <div class="flex gap-3">
-            <button
-              id="submit-offer-btn"
-              onclick="submitOffer()"
-              class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors inline-flex items-center justify-center"
-            >
-              Submit Offer
-            </button>
-            <button
-              onclick="hideOfferModal()"
-              class="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
+            <div class="flex gap-3">
+              <button
+                id="submit-offer-btn"
+                onclick="submitOffer()"
+                class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-4 rounded-xl font-bold hover:shadow-xl transition-all inline-flex items-center justify-center hover:scale-105"
+              >
+                Submit Offer
+              </button>
+              <button
+                onclick="hideOfferModal()"
+                class="px-6 py-4 border-2 border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all hover:scale-105"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Features Section -->
-      <section class="py-16 bg-white">
+      <section class="py-20 bg-gradient-to-b from-white to-gray-50">
         <div class="container mx-auto px-4">
-          <div class="max-w-4xl mx-auto">
-            <h2 class="text-3xl font-bold text-center mb-12">Why Choose ${domain}?</h2>
-            <div class="grid md:grid-cols-4 gap-8">
-              <div class="text-center">
-                <div class="text-4xl mb-4">🎯</div>
-                <h3 class="text-xl font-semibold mb-2">Premium Domain</h3>
-                <p class="text-gray-600">Short, memorable, and brandable domain name</p>
+          <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+              <h2 class="text-4xl md:text-5xl font-bold mb-4">
+                <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Why Choose ${domain}?
+                </span>
+              </h2>
+              <p class="text-gray-600 text-lg">Everything you need for a premium domain experience</p>
+            </div>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div class="feature-card relative group">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-2xl opacity-0 group-hover:opacity-75 blur transition duration-300"></div>
+                <div class="relative bg-white rounded-2xl p-8 text-center shadow-lg h-full">
+                  <div class="text-5xl mb-4">🎯</div>
+                  <h3 class="text-xl font-bold mb-3 text-gray-900">Premium Domain</h3>
+                  <p class="text-gray-600">Short, memorable, and brandable domain name</p>
+                </div>
               </div>
-              <div class="text-center">
-                <div class="text-4xl mb-4">🔒</div>
-                <h3 class="text-xl font-semibold mb-2">Secure Transfer</h3>
-                <p class="text-gray-600">Safe and secure domain transfer process</p>
+              <div class="feature-card relative group">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-purple-400 rounded-2xl opacity-0 group-hover:opacity-75 blur transition duration-300"></div>
+                <div class="relative bg-white rounded-2xl p-8 text-center shadow-lg h-full">
+                  <div class="text-5xl mb-4">🔒</div>
+                  <h3 class="text-xl font-bold mb-3 text-gray-900">Secure Transfer</h3>
+                  <p class="text-gray-600">Safe and secure domain transfer process</p>
+                </div>
               </div>
-              <div class="text-center">
-                <div class="text-4xl mb-4">💬</div>
-                <h3 class="text-xl font-semibold mb-2">Direct Communication</h3>
-                <p class="text-gray-600">Chat directly with the seller</p>
+              <div class="feature-card relative group">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-pink-400 rounded-2xl opacity-0 group-hover:opacity-75 blur transition duration-300"></div>
+                <div class="relative bg-white rounded-2xl p-8 text-center shadow-lg h-full">
+                  <div class="text-5xl mb-4">💬</div>
+                  <h3 class="text-xl font-bold mb-3 text-gray-900">Direct Communication</h3>
+                  <p class="text-gray-600">Chat directly with the seller</p>
+                </div>
               </div>
-              <div class="text-center">
-                <div class="text-4xl mb-4">🔗</div>
-                <h3 class="text-xl font-semibold mb-2">Blockchain Verified</h3>
-                <p class="text-gray-600">Tokenized on Doma Protocol for secure ownership</p>
+              <div class="feature-card relative group">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-2xl opacity-0 group-hover:opacity-75 blur transition duration-300"></div>
+                <div class="relative bg-white rounded-2xl p-8 text-center shadow-lg h-full">
+                  <div class="text-5xl mb-4">🔗</div>
+                  <h3 class="text-xl font-bold mb-3 text-gray-900">Blockchain Verified</h3>
+                  <p class="text-gray-600">Tokenized on Doma Protocol for secure ownership</p>
+                </div>
               </div>
             </div>
           </div>
@@ -482,29 +554,35 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       </section>
 
       <!-- Footer -->
-      <footer class="bg-gray-900 text-white py-12">
-        <div class="container mx-auto px-4">
-          <div class="max-w-4xl mx-auto">
-            <div class="grid md:grid-cols-3 gap-8">
+      <footer class="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-16 overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+          <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600"></div>
+        </div>
+        <div class="container mx-auto px-4 relative z-10">
+          <div class="max-w-6xl mx-auto">
+            <div class="grid md:grid-cols-3 gap-12 mb-12">
               <div>
-                <h3 class="text-lg font-semibold mb-4">About ${domain}</h3>
-                <p class="text-gray-400">Premium domain name available for purchase. Secure your brand with this memorable domain.</p>
+                <h3 class="text-xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">About ${domain}</h3>
+                <p class="text-gray-300 leading-relaxed">Premium domain name available for purchase. Secure your brand with this memorable domain.</p>
               </div>
               <div id="footer-contact">
-                <h3 class="text-lg font-semibold mb-4">Contact</h3>
-                <p class="text-gray-400 mb-2">Interested in purchasing?</p>
+                <h3 class="text-xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Contact</h3>
+                <p class="text-gray-300 mb-2">Interested in purchasing?</p>
                 <p class="text-gray-400">Check listing status above</p>
               </div>
               <div>
-                <h3 class="text-lg font-semibold mb-4">Powered by</h3>
-                <p class="text-gray-400">Domayne - Premium Domain Marketplace</p>
-                <a href="https://domayne.xyz" class="text-blue-400 hover:text-blue-300 transition-colors" target="_blank">
-                  Visit Domayne →
+                <h3 class="text-xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Powered by</h3>
+                <p class="text-gray-300 mb-3">Domayne - Premium Domain Marketplace</p>
+                <a href="https://domayne.xyz" class="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors font-semibold group" target="_blank">
+                  Visit Domayne
+                  <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                  </svg>
                 </a>
               </div>
             </div>
-            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-              <p>&copy; 2024 ${domain}. All rights reserved.</p>
+            <div class="border-t border-gray-700 pt-8 text-center">
+              <p class="text-gray-400">&copy; 2025 ${domain}. All rights reserved.</p>
             </div>
           </div>
         </div>
