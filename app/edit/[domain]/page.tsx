@@ -7,14 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Download, Eye, Globe, Upload, ExternalLink, Settings, DollarSign, MessageCircle, Wallet, Copy, Check } from "lucide-react";
+import { ArrowLeft, Download, Globe, Upload, ExternalLink, Settings, MessageCircle, Wallet, Copy, Check, Edit } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { DomainPointingInstructions } from '@/components/domain-pointing-instructions';
 import { AmountInput } from '@/components/ui/amount-input';
 import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from 'wagmi';
-import { useEnsName } from 'wagmi';
 import { createDomaOrderbookClient, OrderbookType, viemToEthersSigner } from '@doma-protocol/orderbook-sdk';
 
 interface PageSettings {
@@ -26,7 +25,6 @@ interface PageSettings {
   currency: string;
   industryTags: string[];
   sellerAddress?: string;
-  sellerEns?: string;
   enableXMTP: boolean;
 }
 
@@ -69,7 +67,6 @@ export default function SitePreviewPage() {
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
-  const { data: ensName } = useEnsName({ address });
   const { switchChain } = useSwitchChain();
   const { data: walletClient } = useWalletClient();
 
@@ -84,7 +81,6 @@ export default function SitePreviewPage() {
     industryTags: [],
     // XMTP configuration
     sellerAddress: '',
-    sellerEns: '',
     enableXMTP: true
   });
 
@@ -115,18 +111,11 @@ export default function SitePreviewPage() {
   // Auto-populate seller info when wallet connects
   useEffect(() => {
     if (isConnected && address) {
-      const updates: Partial<PageSettings> = {
+      updatePageSettings({
         sellerAddress: address,
-      };
-
-      // Also set ENS if available
-      if (ensName) {
-        updates.sellerEns = ensName;
-      }
-
-      updatePageSettings(updates);
+      });
     }
-  }, [isConnected, address, ensName]);
+  }, [isConnected, address]);
 
   // Wallet connection handlers
   const handleConnectWallet = () => {
@@ -138,24 +127,17 @@ export default function SitePreviewPage() {
 
   const handleDisconnectWallet = () => {
     disconnect();
-    // Clear the seller address and ENS when disconnecting
+    // Clear the seller address when disconnecting
     updatePageSettings({
-      sellerAddress: '',
-      sellerEns: ''
+      sellerAddress: ''
     });
   };
 
   const handleUseConnectedWallet = () => {
     if (address) {
-      const updates: Partial<PageSettings> = {
+      updatePageSettings({
         sellerAddress: address,
-      };
-
-      if (ensName) {
-        updates.sellerEns = ensName;
-      }
-
-      updatePageSettings(updates);
+      });
     }
   };
 
@@ -464,14 +446,14 @@ export default function SitePreviewPage() {
           <Link href="/">
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="w-4 h-4" />
-              Back to Generator
+              Back home
             </Button>
           </Link>
 
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1">
-              <Eye className="w-3 h-3" />
-              Preview
+              <Edit className="w-3 h-3" />
+              Edit
             </Badge>
             <Badge variant="outline">{domain}</Badge>
             {publishResult && (
@@ -522,10 +504,11 @@ export default function SitePreviewPage() {
                     <span className="ml-2">https://{domain}</span>
                   </div>
                   <iframe
+                    key={`preview-${pageSettings.enableXMTP}-${pageSettings.sellerAddress}`}
                     src={`/domain/${encodeURIComponent(domain)}?${new URLSearchParams({
                       ...(pageSettings.price && { price: pageSettings.price }),
                       ...(pageSettings.currency && { currency: pageSettings.currency }),
-                      ...(pageSettings.sellerAddress && { sellerAddress: pageSettings.sellerAddress })
+                      ...(pageSettings.sellerAddress && pageSettings.enableXMTP && { sellerAddress: pageSettings.sellerAddress })
                     }).toString()}`}
                     className="w-full h-[600px] border-0"
                     title="Site Preview"
@@ -635,43 +618,45 @@ export default function SitePreviewPage() {
               </CardContent>
             </Card>
 
-            {/* Pricing Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5" />
-                  Pricing
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AmountInput
-                  price={pageSettings.price}
-                  currency={pageSettings.currency}
-                  onPriceChange={(price) => updatePageSettings({ price })}
-                  onCurrencyChange={(currency) => updatePageSettings({ currency })}
-                  placeholder="0.0001"
-                  ethOnly={true}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Doma Listing Management */}
+            {/* Pricing & Doma Listing Management */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M17 13v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6.01"/>
                   </svg>
-                  Doma Protocol Listing
+                  Doma Listing
                   {isCheckingListing && (
                     <div className="w-4 h-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
                   )}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  List your domain on the Doma Protocol blockchain marketplace
+                  Set your price and list on the Doma Protocol blockchain marketplace
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Price Input */}
+                <div className="space-y-2">
+
+                  <AmountInput
+                    price={pageSettings.price}
+                    currency={pageSettings.currency}
+                    onPriceChange={(price) => updatePageSettings({ price })}
+                    onCurrencyChange={(currency) => updatePageSettings({ currency })}
+                    placeholder="0.0001"
+                    ethOnly={true}
+                  />
+                  {!pageSettings.price && (
+                    <p className="text-xs text-muted-foreground">
+                      Set your price to enable Doma Protocol listing
+                    </p>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t"></div>
+
+                {/* Doma Listing Status */}
                 {domaListing ? (
                   // Existing listing display
                   <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
@@ -684,7 +669,7 @@ export default function SitePreviewPage() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Price:</span>
-                        <p className="font-semibold">{domaListing.price} {domaListing.currency}</p>
+                        <p className="font-semibold">{domaListing.price} ETH</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Network:</span>
@@ -803,7 +788,10 @@ export default function SitePreviewPage() {
                 {/* Create listing modal/dialog would go here */}
                 {showCreateListing && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4">
+                    <div 
+                      key={`listing-modal-${pageSettings.price}`}
+                      className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4"
+                    >
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold">List on Doma Protocol</h3>
                         <Button
@@ -825,7 +813,7 @@ export default function SitePreviewPage() {
                           <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg mb-4">
                             <p className="text-xs text-blue-700 dark:text-blue-300">
                               <strong>Your domain details:</strong><br/>
-                              Price: {pageSettings.price} {pageSettings.currency}<br/>
+                              Price: <strong>{pageSettings.price || '0'} ETH</strong><br/>
                               Network: Sepolia Testnet<br/>
                               Owner: {address?.slice(0, 6)}...{address?.slice(-4)}
                             </p>
@@ -996,27 +984,6 @@ export default function SitePreviewPage() {
                             </Button>
                           </div>
 
-                          {ensName && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-muted-foreground">ENS:</span>
-                              <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded text-xs font-mono">
-                                {ensName}
-                              </code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => copyToClipboard(ensName, 'ens')}
-                                className="p-1 h-6 w-6"
-                              >
-                                {copiedField === 'ens' ? (
-                                  <Check className="w-3 h-3 text-green-600" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                              </Button>
-                            </div>
-                          )}
-
                           <Button
                             variant="default"
                             size="sm"
@@ -1060,39 +1027,7 @@ export default function SitePreviewPage() {
                         className="font-mono text-sm"
                       />
                       <p className="text-xs text-muted-foreground">
-                        The Ethereum wallet address buyers will send messages to
-                      </p>
-                    </div>
-
-                    <div className="text-center text-xs text-muted-foreground">— OR —</div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="sellerEns">Seller ENS Name</Label>
-                        {pageSettings.sellerEns && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(pageSettings.sellerEns || '', 'sellerEns')}
-                            className="p-1 h-6 w-6"
-                          >
-                            {copiedField === 'sellerEns' ? (
-                              <Check className="w-3 h-3 text-green-600" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                      <Input
-                        id="sellerEns"
-                        value={pageSettings.sellerEns || ''}
-                        onChange={(e) => updatePageSettings({ sellerEns: e.target.value })}
-                        placeholder="seller.eth"
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        ENS domain that resolves to your wallet address (recommended)
+                        The Ethereum wallet address buyers will send XMTP messages to
                       </p>
                     </div>
 
@@ -1112,18 +1047,18 @@ export default function SitePreviewPage() {
                       </div>
                     </div>
 
-                    {!pageSettings.sellerAddress && !pageSettings.sellerEns && (
+                    {!pageSettings.sellerAddress && (
                       <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">
                         <p className="text-sm text-amber-800 dark:text-amber-200">
-                          <strong>⚠️ No seller configured:</strong> The chat widget will show an email fallback using the contact email above.
+                          <strong>⚠️ No seller address configured:</strong> Buyers won&apos;t be able to contact you via XMTP chat.
                         </p>
                       </div>
                     )}
 
-                    {pageSettings.sellerAddress && pageSettings.sellerEns && (
+                    {pageSettings.sellerAddress && (
                       <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
                         <p className="text-sm text-green-800 dark:text-green-200">
-                          <strong>✅ Multiple options configured:</strong> ENS will be used first, with wallet address as fallback.
+                          <strong>✅ XMTP chat enabled:</strong> Buyers can message {pageSettings.sellerAddress.slice(0, 6)}...{pageSettings.sellerAddress.slice(-4)}
                         </p>
                       </div>
                     )}

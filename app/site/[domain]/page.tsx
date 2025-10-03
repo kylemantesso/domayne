@@ -1,12 +1,11 @@
 'use client'
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Globe } from "lucide-react";
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { AmountInput, formatPrice } from '@/components/ui/amount-input';
+import { AmountInput } from '@/components/ui/amount-input';
 
 
 
@@ -47,38 +46,18 @@ export default function SitePreviewPage() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Globe className="w-5 h-5" />
-              <span className="font-semibold">This page is available to claim</span>
+              <span className="font-semibold">Site preview</span>
             </div>
 
-            {/* Live Preview Amount Input */}
-            <div className="hidden sm:flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5">
-              <span className="text-sm font-medium">Try pricing:</span>
-              <AmountInput
-                price={previewPrice}
-                currency={previewCurrency}
-                onPriceChange={setPreviewPrice}
-                onCurrencyChange={setPreviewCurrency}
-                compact={true}
-                showIcon={false}
-                placeholder="0"
-                className="text-white"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {previewPrice && (
-              <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-                {formatPrice(previewPrice, previewCurrency)}
-              </Badge>
-            )}
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              Free Setup
-            </Badge>
+           
+
             <Link href={createEditUrl()}>
               <Button size="sm" variant="secondary" className="gap-2">
                 <Edit className="w-4 h-4" />
-                Claim this page
+                Finish setup
               </Button>
             </Link>
           </div>

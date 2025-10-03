@@ -125,7 +125,7 @@ export function AmountInput({
   if (ethOnly) {
     return (
       <div className={`space-y-2 ${className}`}>
-        <Label htmlFor="price">Price (Optional)</Label>
+        <Label htmlFor="price">Price</Label>
         <div className="relative">
           <Input
             id="price"
