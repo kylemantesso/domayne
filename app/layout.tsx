@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next"
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { WalletProvider } from "@/components/providers/wallet-provider";
@@ -77,6 +78,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </WalletProvider>
+        <Analytics />
       </body>
     </html>
   );
