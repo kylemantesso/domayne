@@ -1,32 +1,21 @@
-import { NextRequest } from 'next/server'
-
-interface DomainSettings {
-  title: string
-  description: string
-  price: string
-  currency: string
-  sellerAddress: string
-}
-
-function generateStaticHTML(domain: string, settings: DomainSettings): string {
-  return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${settings.title || `Buy ${domain} – Premium Domain`}</title>
-    <meta name="description" content="${settings.description || `${domain} is available for purchase. Premium domain name perfect for your business.`}" />
+    <title>Buy ewv1.ai – A Premium Domain for Your Brand</title>
+    <meta name="description" content="ewv1.ai is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business." />
 
     <!-- OpenGraph -->
-    <meta property="og:title" content="${settings.title || `Buy ${domain} – Premium Domain`}" />
-    <meta property="og:description" content="${settings.description || `${domain} is available for purchase. Premium domain name perfect for your business.`}" />
-    <meta property="og:url" content="https://${domain}" />
+    <meta property="og:title" content="Buy ewv1.ai – A Premium Domain for Your Brand" />
+    <meta property="og:description" content="ewv1.ai is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business." />
+    <meta property="og:url" content="https://ewv1.ai" />
     <meta property="og:type" content="website" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${settings.title || `Buy ${domain} – Premium Domain`}" />
-    <meta name="twitter:description" content="${settings.description || `${domain} is available for purchase. Premium domain name perfect for your business.`}" />
+    <meta name="twitter:title" content="Buy ewv1.ai – A Premium Domain for Your Brand" />
+    <meta name="twitter:description" content="ewv1.ai is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business." />
 
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>" />
@@ -40,8 +29,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
     <script>
       // Global configuration
       window.domainSettings = {
-        domain: "${domain}",
-        sellerAddress: "${settings.sellerAddress || ''}",
+        domain: "ewv1.ai",
+        sellerAddress: "0x5E02C165Ca300Fd9dB5912892e0ED74AE2639e15",
         // Auto-detect API URL: use current origin if on domayne.xyz, otherwise use production
         apiUrl: window.location.hostname.includes('domayne.xyz') || window.location.hostname === 'localhost' 
           ? window.location.origin 
@@ -56,8 +45,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         if (sellerAddress) {
           // Detect if we're on localhost for development
           const chatUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? \`\${window.location.origin}/chat/\${sellerAddress}\`
-            : \`https://domayne.xyz/chat/\${sellerAddress}\`;
+            ? `${window.location.origin}/chat/${sellerAddress}`
+            : `https://domayne.xyz/chat/${sellerAddress}`;
           window.open(chatUrl, '_blank');
         } else {
           alert('No seller address configured for this domain.');
@@ -100,22 +89,22 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
 
         if (window.domainSettings.walletConnected) {
           const address = window.domainSettings.currentAddress;
-          const shortAddress = \`\${address.slice(0, 6)}...\${address.slice(-4)}\`;
+          const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
           
-          const desktopHTML = \`
+          const desktopHTML = `
             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               <path d="M9 12l2 2 4-4"/>
             </svg>
-            \${shortAddress}
-          \`;
-          const mobileHTML = \`
+            ${shortAddress}
+          `;
+          const mobileHTML = `
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               <path d="M9 12l2 2 4-4"/>
             </svg>
-            \${shortAddress}
-          \`;
+            ${shortAddress}
+          `;
           
           if (walletBtn) {
             walletBtn.innerHTML = desktopHTML;
@@ -126,20 +115,20 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             walletBtnMobile.onclick = disconnectWallet;
           }
         } else {
-          const desktopHTML = \`
+          const desktopHTML = `
             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
               <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
             </svg>
             Connect Wallet
-          \`;
-          const mobileHTML = \`
+          `;
+          const mobileHTML = `
             <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
               <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
             </svg>
             Connect Wallet
-          \`;
+          `;
           
           if (walletBtn) {
             walletBtn.innerHTML = desktopHTML;
@@ -185,17 +174,17 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         const submitBtn = document.getElementById('submit-offer-btn');
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.innerHTML = \`
+          submitBtn.innerHTML = `
             <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
               <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="0.75"/>
             </svg>
             Submitting...
-          \`;
+          `;
         }
 
         try {
-          alert(\`Offer functionality coming soon! You offered: \${offerAmount} ETH for \${window.domainSettings.domain}\`);
+          alert(`Offer functionality coming soon! You offered: ${offerAmount} ETH for ${window.domainSettings.domain}`);
           hideOfferModal();
           if (offerInput) offerInput.value = '';
         } catch (error) {
@@ -222,7 +211,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         const buttonsElDesktop = document.getElementById('action-buttons-desktop');
         
         try {
-          const response = await fetch(\`\${window.domainSettings.apiUrl}/api/doma/check-listing?domain=\${encodeURIComponent(domain)}\`);
+          const response = await fetch(`${window.domainSettings.apiUrl}/api/doma/check-listing?domain=${encodeURIComponent(domain)}`);
           const data = await response.json();
           
           if (data.listing) {
@@ -230,13 +219,13 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             window.domainSettings.currentListing = listing;
             
             const currencySymbol = listing.currency === 'ETH' || listing.currency === 'WETH' ? '' : '$';
-            const priceHTML = \`
+            const priceHTML = `
               <div class="text-6xl md:text-7xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4 tracking-tight">
-                \${currencySymbol}\${listing.price} \${listing.currency === 'ETH' || listing.currency === 'WETH' ? '<span class="text-5xl md:text-6xl">' + listing.currency + '</span>' : ''}
+                ${currencySymbol}${listing.price} ${listing.currency === 'ETH' || listing.currency === 'WETH' ? '<span class="text-5xl md:text-6xl">' + listing.currency + '</span>' : ''}
               </div>
-            \`;
+            `;
             
-            const listingHTML = \`
+            const listingHTML = `
               <div class="relative max-w-md mx-auto group">
                 <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl opacity-75 blur group-hover:opacity-100 transition duration-300"></div>
                 <div class="relative bg-white rounded-2xl p-6 shadow-xl">
@@ -251,20 +240,20 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                   <div class="grid gap-3">
                     <div class="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                       <span class="text-sm font-medium text-gray-600">Network:</span>
-                      <span class="text-sm font-bold text-gray-900">\${listing.network}</span>
+                      <span class="text-sm font-bold text-gray-900">${listing.network}</span>
                     </div>
                     <div class="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                       <span class="text-sm font-medium text-gray-600">Token ID:</span>
-                      <span class="text-sm font-mono font-semibold text-gray-900">\${listing.tokenId.slice(0, 12)}...</span>
+                      <span class="text-sm font-mono font-semibold text-gray-900">${listing.tokenId.slice(0, 12)}...</span>
                     </div>
                     <div class="flex items-center justify-between py-2 px-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                       <span class="text-sm font-medium text-gray-600">Listed:</span>
-                      <span class="text-sm font-bold text-gray-900">\${new Date(listing.createdAt).toLocaleDateString()}</span>
+                      <span class="text-sm font-bold text-gray-900">${new Date(listing.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
               </div>
-            \`;
+            `;
             
             // Update price for both mobile and desktop
             if (priceElMobile) priceElMobile.innerHTML = priceHTML;
@@ -284,18 +273,18 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             const modalInfo = document.getElementById('listing-info-modal');
             if (modalInfo) {
               const currencySymbol = listing.currency === 'ETH' || listing.currency === 'WETH' ? '' : '$';
-              modalInfo.innerHTML = \`
+              modalInfo.innerHTML = `
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
                   <p class="text-sm text-gray-600">Current Listing Price</p>
                   <p class="text-xl font-bold text-blue-600">
-                    \${currencySymbol}\${listing.price} \${listing.currency === 'ETH' || listing.currency === 'WETH' ? listing.currency : ''}
+                    ${currencySymbol}${listing.price} ${listing.currency === 'ETH' || listing.currency === 'WETH' ? listing.currency : ''}
                   </p>
                 </div>
-              \`;
+              `;
             }
             
             // Update buttons to show "Make Offer" and "Buy on Doma"
-            const walletButton = \`
+            const walletButton = `
               <button
                 id="wallet-button"
                 onclick="connectWallet()"
@@ -307,10 +296,10 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Connect Wallet
               </button>
-            \`;
-            const buyButton = \`
+            `;
+            const buyButton = `
               <a
-                href="https://doma.xyz/domain/\${domain}"
+                href="https://doma.xyz/domain/${domain}"
                 target="_blank"
                 class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
               >
@@ -319,8 +308,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Buy Now on Doma
               </a>
-            \`;
-            const chatButton = window.domainSettings.sellerAddress ? \`
+            `;
+            const chatButton = window.domainSettings.sellerAddress ? `
               <button
                 onclick="handleChatClick()"
                 class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
@@ -330,9 +319,9 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Contact Seller
               </button>
-            \` : '';
+            ` : '';
             
-            const mobileWalletButton = \`
+            const mobileWalletButton = `
               <button
                 id="wallet-button-mobile"
                 onclick="connectWallet()"
@@ -344,10 +333,10 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Connect Wallet
               </button>
-            \`;
-            const mobileBuyButton = \`
+            `;
+            const mobileBuyButton = `
               <a
-                href="https://doma.xyz/domain/\${domain}"
+                href="https://doma.xyz/domain/${domain}"
                 target="_blank"
                 class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl"
               >
@@ -356,8 +345,8 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Buy Now on Doma
               </a>
-            \`;
-            const mobileChatButton = window.domainSettings.sellerAddress ? \`
+            `;
+            const mobileChatButton = window.domainSettings.sellerAddress ? `
               <button
                 onclick="handleChatClick()"
                 class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl"
@@ -367,7 +356,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Contact Seller
               </button>
-            \` : '';
+            ` : '';
             
             if (buttonsElDesktop) buttonsElDesktop.innerHTML = walletButton + buyButton + chatButton;
             if (buttonsElMobile) buttonsElMobile.innerHTML = mobileWalletButton + mobileBuyButton + mobileChatButton;
@@ -383,13 +372,13 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             // Update footer contact section
             const footerContact = document.getElementById('footer-contact');
             if (footerContact) {
-              footerContact.innerHTML = \`
+              footerContact.innerHTML = `
                 <h3 class="text-lg font-semibold mb-4">Contact</h3>
                 <p class="text-gray-400 mb-2">Interested in purchasing?</p>
                 <button onclick="connectWallet()" class="text-green-400 hover:text-green-300 transition-colors">
                   Make an offer →
                 </button>
-              \`;
+              `;
             }
           }
         } catch (error) {
@@ -467,7 +456,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
         <div class="container mx-auto px-4 py-3">
           <div class="flex items-center justify-between">
             <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              ${domain}
+              ewv1.ai
             </h1>
             <div class="flex items-center gap-2 text-xs md:text-sm text-gray-600">
               <svg class="w-3 h-3 md:w-4 md:h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -492,13 +481,13 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             
             <h1 class="text-4xl md:text-5xl font-black mb-4 leading-tight">
               <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animated-gradient">
-                ${domain}
+                ewv1.ai
               </span>
               <div class="text-2xl md:text-3xl mt-3 text-gray-700">is available!</div>
             </h1>
 
             <p class="text-base text-gray-600 mb-6 leading-relaxed">
-              ${settings.description || `Secure this premium domain name before someone else does. Short, memorable, and brandable – perfect for establishing your online presence and building lasting credibility.`}
+              ewv1.ai is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.
             </p>
 
             <!-- Trust Badges Mobile -->
@@ -543,7 +532,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
 
             <!-- Action buttons (populated dynamically) -->
             <div id="action-buttons-mobile" class="flex flex-wrap justify-center gap-3">
-              ${settings.sellerAddress ? `
+              
               <button
                 onclick="handleChatClick()"
                 class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-2xl text-base font-bold shadow-xl hover:shadow-2xl"
@@ -553,7 +542,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                 </svg>
                 Contact Seller
               </button>
-              ` : ''}
+              
             </div>
           </div>
 
@@ -569,13 +558,13 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               
               <h1 class="text-5xl xl:text-6xl font-black leading-tight">
                 <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animated-gradient">
-                  ${domain}
+                  ewv1.ai
                 </span>
                 <div class="text-3xl xl:text-4xl mt-3 text-gray-700">is available!</div>
               </h1>
 
               <p class="text-lg text-gray-600 leading-relaxed">
-                ${settings.description || `Secure this premium domain name before someone else does. Short, memorable, and brandable – perfect for establishing your online presence and building lasting credibility.`}
+                ewv1.ai is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.
               </p>
 
               <!-- Trust Badges Desktop -->
@@ -609,7 +598,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
 
               <!-- Action buttons (populated dynamically) -->
               <div id="action-buttons-desktop" class="flex flex-wrap gap-4 pt-2">
-                ${settings.sellerAddress ? `
+                
                 <button
                   onclick="handleChatClick()"
                   class="action-btn inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-10 py-5 rounded-2xl text-lg font-bold shadow-xl hover:shadow-2xl"
@@ -619,7 +608,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
                   </svg>
                   Contact Seller
                 </button>
-                ` : ''}
+                
               </div>
             </div>
 
@@ -655,7 +644,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             </div>
 
             <div class="mb-6">
-              <p class="text-gray-600 mb-4">Submit your offer for <strong class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">${domain}</strong></p>
+              <p class="text-gray-600 mb-4">Submit your offer for <strong class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">ewv1.ai</strong></p>
               
               <div id="listing-info-modal" class="mb-4"></div>
 
@@ -700,7 +689,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           <div class="max-w-4xl mx-auto">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div class="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl">
-                <div class="text-3xl font-bold text-blue-600 mb-2">${domain.split('.')[0].length}</div>
+                <div class="text-3xl font-bold text-blue-600 mb-2">4</div>
                 <div class="text-sm text-gray-600 font-medium">Characters</div>
               </div>
               <div class="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
@@ -758,7 +747,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
             <div class="text-center mb-16">
               <h2 class="text-4xl md:text-5xl font-bold mb-4">
                 <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Why Choose ${domain}?
+                  Why Choose ewv1.ai?
                 </span>
               </h2>
               <p class="text-gray-600 text-lg">Everything you need for a premium domain experience</p>
@@ -887,7 +876,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
       <section class="py-16 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
         <div class="container mx-auto px-4">
           <div class="max-w-4xl mx-auto text-center text-white">
-            <h2 class="text-4xl md:text-5xl font-bold mb-6">Ready to Own ${domain}?</h2>
+            <h2 class="text-4xl md:text-5xl font-bold mb-6">Ready to Own ewv1.ai?</h2>
             <p class="text-xl mb-8 text-white/90">Don't miss this opportunity. Premium domains sell fast.</p>
             <div class="flex flex-wrap justify-center gap-4">
               <a href="#action-buttons" class="inline-flex items-center gap-2 bg-white text-blue-600 px-10 py-5 rounded-2xl text-lg font-bold shadow-2xl hover:shadow-xl hover:scale-105 transition-all">
@@ -913,7 +902,7 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
           <div class="max-w-6xl mx-auto">
             <div class="grid md:grid-cols-3 gap-12 mb-12">
               <div>
-                <h3 class="text-xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">About ${domain}</h3>
+                <h3 class="text-xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">About ewv1.ai</h3>
                 <p class="text-gray-300 leading-relaxed">Premium domain name available for purchase. Secure your brand with this memorable domain.</p>
               </div>
               <div id="footer-contact">
@@ -933,55 +922,11 @@ function generateStaticHTML(domain: string, settings: DomainSettings): string {
               </div>
             </div>
             <div class="border-t border-gray-700 pt-8 text-center">
-              <p class="text-gray-400">&copy; 2025 ${domain}. All rights reserved.</p>
+              <p class="text-gray-400">&copy; 2025 ewv1.ai. All rights reserved.</p>
             </div>
           </div>
         </div>
       </footer>
     </div>
   </body>
-</html>`
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ domain: string }> }
-) {
-  const { domain: rawDomain } = await params
-  const domain = decodeURIComponent(rawDomain)
-  const searchParams = request.nextUrl.searchParams
-
-  // Get parameters from URL
-  const price = searchParams.get('price') || ''
-  const currency = searchParams.get('currency') || 'USD'
-  const sellerAddress = searchParams.get('sellerAddress') || ''
-
-  // Create settings object (Doma listing will be fetched client-side)
-  const settings: DomainSettings = {
-    title: `Buy ${domain} – A Premium Domain for Your Brand`,
-    description: `${domain} is a premium domain name available for purchase. Perfect for building your brand. Secure, memorable, and ready to power your business.`,
-    price: price,
-    currency: currency,
-    sellerAddress: sellerAddress,
-  }
-
-  try {
-    // Generate static HTML directly as a string
-    const htmlContent = generateStaticHTML(domain, settings)
-
-    const isDownload = searchParams.get('download') === 'true'
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'text/html; charset=utf-8'
-    }
-
-    if (isDownload) {
-      headers['Content-Disposition'] = `attachment; filename="${domain}-landing-page.html"`
-    }
-
-    return new Response(htmlContent, { headers })
-  } catch (error) {
-    console.error('Error generating static HTML:', error)
-    return new Response('Error generating static HTML', { status: 500 })
-  }
-}
+</html>
