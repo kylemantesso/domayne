@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -8,7 +18,7 @@ export async function GET(request: NextRequest) {
     if (!domain) {
       return NextResponse.json(
         { error: 'Domain parameter is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -18,7 +28,7 @@ export async function GET(request: NextRequest) {
       console.error('DOMA_API_KEY not configured');
       return NextResponse.json(
         { error: 'Server configuration error: Missing API key' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -60,7 +70,7 @@ export async function GET(request: NextRequest) {
       console.error('Doma GraphQL API request failed:', response.status, errorText);
       return NextResponse.json(
         { error: `Doma API error: ${response.status}`, details: errorText },
-        { status: response.status }
+        { status: response.status, headers: corsHeaders }
       );
     }
 
@@ -71,7 +81,7 @@ export async function GET(request: NextRequest) {
       console.error('Doma GraphQL API errors:', data.errors);
       return NextResponse.json(
         { error: 'GraphQL query failed', details: data.errors },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -79,7 +89,7 @@ export async function GET(request: NextRequest) {
     if (!tokensData || !tokensData.items) {
       return NextResponse.json(
         { error: 'Domain not found in Doma Protocol' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -87,7 +97,7 @@ export async function GET(request: NextRequest) {
     if (tokens.length === 0) {
       return NextResponse.json(
         { error: 'No tokens found for this domain' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -99,7 +109,7 @@ export async function GET(request: NextRequest) {
     if (!ownershipToken) {
       return NextResponse.json(
         { error: 'No ownership token found for this domain' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -117,13 +127,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       domain,
       nftDetails 
-    });
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('Error getting domain NFT details:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

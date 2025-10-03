@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
+ * CORS headers for cross-origin requests (e.g., from IPFS)
+ */
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Api-Key, x-chain-id, Accept, User-Agent',
+  'Access-Control-Max-Age': '86400',
+};
+
+/**
  * Transparent proxy for Doma API calls
  * This allows the Doma SDK to make API calls through our backend
  * keeping the API key secure on the server
  */
+
+/**
+ * Handle OPTIONS preflight requests
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path?: string[] }> }
@@ -48,7 +69,7 @@ async function handleProxyRequest(
       console.error('DOMA_API_KEY not configured');
       return NextResponse.json(
         { error: 'Server configuration error: Missing API key' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -70,7 +91,7 @@ async function handleProxyRequest(
       } else {
         console.warn(`[Doma Proxy] Fee endpoint called without contract address`);
         // Return empty fees to allow SDK to continue
-        return NextResponse.json({ marketplaceFees: [] }, { status: 200 });
+        return NextResponse.json({ marketplaceFees: [] }, { status: 200, headers: corsHeaders });
       }
     }
 
@@ -155,12 +176,13 @@ async function handleProxyRequest(
       console.log(`[Doma Proxy] Success: ${response.status}`);
     }
 
-    // Return the response
+    // Return the response with CORS headers
     return new NextResponse(responseText, {
       status: response.status,
       statusText: response.statusText,
       headers: {
         'Content-Type': response.headers.get('Content-Type') || 'application/json',
+        ...corsHeaders,
       },
     });
 
@@ -171,7 +193,7 @@ async function handleProxyRequest(
         error: 'Proxy error',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
