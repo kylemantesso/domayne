@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Domayne - Create A Landing Page For Your Domain",
   description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://domayne.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://domaybe.xyz'),
   keywords: ["domain", "landing page", "web3", "blockchain", "domain management"],
   authors: [{ name: "Domayne" }],
   creator: "Domayne",
@@ -49,11 +49,10 @@ export const metadata: Metadata = {
     title: "Domayne - Create A Landing Page For Your Domain",
     description: "Create beautiful, instant landing pages for your domains. Deploy in seconds with Domayne.",
     images: ["/og.png"],
-    creator: "@domayne",
+    creator: "@domayne_xyz",
   },
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
     ],
