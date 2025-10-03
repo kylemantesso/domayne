@@ -13,6 +13,47 @@ import { formatDistanceToNow } from 'date-fns';
 import { Client, type Signer, type Dm, type DecodedMessage, type AsyncStreamProxy } from '@xmtp/browser-sdk';
 import { toBytes } from 'viem';
 
+// Helper function to safely extract text content from XMTP message
+function getMessageText(content: unknown): string {
+  // If content is already a string, return it
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  // If content is an object, try common properties
+  if (typeof content === 'object' && content !== null) {
+    // Try text property (most common in XMTP v3/v4)
+    if ('text' in content && typeof content.text === 'string') {
+      return content.text;
+    }
+    
+    // Try content property
+    if ('content' in content && typeof content.content === 'string') {
+      return content.content;
+    }
+    
+    // Try message property
+    if ('message' in content && typeof content.message === 'string') {
+      return content.message;
+    }
+  }
+  
+  // Fallback: return empty string for non-text content (system messages)
+  return '';
+}
+
+// Helper function to check if a message is a system/metadata message
+function isSystemMessage(content: unknown): boolean {
+  if (typeof content === 'object' && content !== null) {
+    // Check for common system message properties
+    return 'initiatedByInboxId' in content || 
+           'addedInboxes' in content || 
+           'removedInboxes' in content ||
+           'metadataFieldChanges' in content;
+  }
+  return false;
+}
+
 // Conversation list item component
 function ConversationItem({ 
   conversation, 
@@ -59,15 +100,15 @@ function ConversationItem({
     >
       <div className="flex items-start justify-between mb-1">
         <p className="font-medium text-sm">{formatAddress(peerInboxId)}</p>
-        {lastMessage && (
+        {lastMessage && !isSystemMessage(lastMessage.content) && (
           <p className="text-xs text-muted-foreground">
             {formatTime(lastMessage.sentAtNs)}
           </p>
         )}
       </div>
-      {lastMessage && (
+      {lastMessage && !isSystemMessage(lastMessage.content) && (
         <p className="text-sm text-muted-foreground truncate">
-          {String(lastMessage.content)}
+          {getMessageText(lastMessage.content)}
         </p>
       )}
     </div>
@@ -476,44 +517,46 @@ export default function ChatPage() {
                     <div className="flex items-center justify-center h-full">
                       <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                     </div>
-                  ) : messages.length === 0 ? (
+                  ) : messages.filter(msg => !isSystemMessage(msg.content)).length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
                       <MessageCircle className="w-12 h-12 mb-4 opacity-50" />
                       <p>No messages yet. Start the conversation!</p>
                     </div>
                   ) : (
-                    messages.map((message, idx) => {
-                      // Check if this message is from the current user
-                      const isSender = message.senderInboxId === client?.inboxId;
-                      // Convert nanoseconds to Date
-                      const sentDate = new Date(Number(message.sentAtNs / BigInt(1000000)));
-                      
-                      return (
-                        <div
-                          key={idx}
-                          className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}
-                        >
+                    messages
+                      .filter(message => !isSystemMessage(message.content))
+                      .map((message, idx) => {
+                        // Check if this message is from the current user
+                        const isSender = message.senderInboxId === client?.inboxId;
+                        // Convert nanoseconds to Date
+                        const sentDate = new Date(Number(message.sentAtNs / BigInt(1000000)));
+                        
+                        return (
                           <div
-                            className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                              isSender
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                            }`}
+                            key={idx}
+                            className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}
                           >
-                            <p className="break-words">{String(message.content)}</p>
-                            <p
-                              className={`text-xs mt-1 ${
+                            <div
+                              className={`max-w-[70%] rounded-lg px-4 py-2 ${
                                 isSender
-                                  ? 'text-blue-100'
-                                  : 'text-gray-500 dark:text-gray-400'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                               }`}
                             >
-                              {formatDistanceToNow(sentDate, { addSuffix: true })}
-                            </p>
+                              <p className="break-words">{getMessageText(message.content)}</p>
+                              <p
+                                className={`text-xs mt-1 ${
+                                  isSender
+                                    ? 'text-blue-100'
+                                    : 'text-gray-500 dark:text-gray-400'
+                                }`}
+                              >
+                                {formatDistanceToNow(sentDate, { addSuffix: true })}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   )}
                   <div ref={messagesEndRef} />
                 </div>
